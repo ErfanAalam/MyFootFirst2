@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "503667392757",
+    "project_id": "my-foot-first",
+    "storage_bucket": "my-foot-first.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:503667392757:android:69477cc16d31fe900ac5bc",
+        "android_client_info": {
+          "package_name": "com.myfootfirst2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "503667392757-4ppt2gc6qsjmf37l5vm918oh46o0advh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.myfootfirst2",
+            "certificate_hash": "9808ddb441b9205998c6ed005d773dcc7c2baa3a"
+          }
+        },
+        {
+          "client_id": "503667392757-496lchn6jf0v7a53hqe0jkkq044b7m16.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYvAeOt1T1BW5djbXOycG_X4NCXT0ELZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "503667392757-496lchn6jf0v7a53hqe0jkkq044b7m16.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
