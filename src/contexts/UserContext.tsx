@@ -21,7 +21,8 @@ interface UserData {
   businessType: string;
   callingCode: string;
   city: string;
-  contactName: string;
+  contactFirstName:String,
+  contactLastName: string;
   contactRole: string;
   country: string;
   countryCode: string;
@@ -32,6 +33,7 @@ interface UserData {
   sellsOrthotics: string;
   state: string;
   uid: string;
+  RetailerId: String,
 }
 
 interface UserContextType {
@@ -117,7 +119,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           businessType: data?.businessType || '',
           callingCode: data?.callingCode || '',
           city: data?.city || '',
-          contactName: data?.contactName || '',
+          contactFirstName: data?.contactFirstName || '',
+          contactLastName:data?.contactLastName || '',
           contactRole: data?.contactRole || '',
           country: data?.country || '',
           countryCode: data?.countryCode || '',
@@ -128,7 +131,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           sellsOrthotics: data?.sellsOrthotics || '',
           state: data?.state || '',
           uid: data?.uid || '',
-          ...data // includes any extra fields like employees
+          RetailerId:data?.RetailerId || '',
+          ...data, // includes any extra fields like employees
         });
       }
     });
@@ -144,7 +148,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading,
     isLoggedIn,
     setIsLoggedIn,
-    setUserData
+    setUserData,
   };
 
   return (

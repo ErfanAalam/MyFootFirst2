@@ -6,60 +6,70 @@ import {
     StyleSheet,
     SafeAreaView,
     ScrollView,
-    Alert,
 } from 'react-native';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
+import CustomAlertModal from '../../Components/CustomAlertModal';
 
 const SignUpPassword = ({ route }: { route: any }) => {
     const navigation = useNavigation<NavigationProp<ParamListBase>>();
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        title: string;
+        message: string;
+        type: 'success' | 'error' | 'info';
+    }>({
+        title: '',
+        message: '',
+        type: 'info',
+    });
 
-    const [businessName, setBusinessName] = useState(route.params.businessName);
-    const [businessType, setBusinessType] = useState(route.params.businessType);
+    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setAlertConfig({ title, message, type });
+        setAlertVisible(true);
+    };
 
-    const [contactFirstName, setContactFirstName] = useState(route.params.contactFirstName);
-    const [contactLastName, setContactLastName] = useState(route.params.contactLastName);
-    const [contactRole, setContactRole] = useState(route.params.contactRole);
-    const [email, setEmail] = useState(route.params.email);
+    // Store route params without setters since they're not modified
+    const {
+        businessName,
+        businessType,
+        contactFirstName,
+        contactLastName,
+        contactRole,
+        email,
+        address,
+        city,
+        state,
+        postalCode,
+        countryCode,
+        callingCode,
+        country,
+        phone,
+    } = route.params;
+
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
-    const [address, setAddress] = useState(route.params.address);
-    const [city, setCity] = useState(route.params.city);
-    const [state, setState] = useState(route.params.state);
-    const [postalCode, setPostalCode] = useState(route.params.postalCode);
-    const [countryCode, setCountryCode] = useState(route.params.countryCode);
-    const [callingCode, setCallingCode] = useState(route.params.callingCode);
-    const [country, setCountry] = useState(route.params.country);
-    const [phone, setPhone] = useState(route.params.phone);
-
-
-
     const validateForm = () => {
-
         if (!password || !confirmPassword) {
-            Alert.alert("Validation Error", "All required fields must be filled.");
+            showAlert("Validation Error", "All required fields must be filled.", 'error');
             return false;
         }
 
         if (password.length < 6) {
-            Alert.alert("Weak Password", "Password must be at least 6 characters.");
+            showAlert("Weak Password", "Password must be at least 6 characters.", 'error');
             return false;
         }
         if (password !== confirmPassword) {
-            Alert.alert("Password Mismatch", "Password and Confirm Password must match.");
+            showAlert("Password Mismatch", "Password and Confirm Password must match.", 'error');
             return false;
         }
         return true;
     };
 
-
-
     const handleSubmit = async () => {
-        // Validate form before proceeding
         if (!validateForm()) return;
 
         try {
-            // Navigate to next screen
             navigation.navigate('SignUpDone', {
                 businessName,
                 businessType,
@@ -77,22 +87,22 @@ const SignUpPassword = ({ route }: { route: any }) => {
                 country,
                 phone,
             });
-
         } catch (error) {
-            console.error('Error during registration:', error);
-            Alert.alert("Registration Failed", (error as Error).message);
+            showAlert("Registration Failed", (error as Error).message, 'error');
         }
     };
 
-
-
-
-
     return (
         <SafeAreaView style={styles.safeArea}>
+            <CustomAlertModal
+                visible={alertVisible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertVisible(false)}
+            />
             <ScrollView contentContainerStyle={styles.container}>
                 <Text style={styles.title}>Set Your Password</Text>
-
 
                 <TextInput
                     placeholder="Password*"
@@ -111,8 +121,6 @@ const SignUpPassword = ({ route }: { route: any }) => {
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                 />
-
-
 
                 <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
                     <Text style={styles.submitButtonText}>Continue</Text>
@@ -163,7 +171,6 @@ const styles = StyleSheet.create({
     placeholderText: {
         color: '#999',
     },
-
 });
 
 export default SignUpPassword;

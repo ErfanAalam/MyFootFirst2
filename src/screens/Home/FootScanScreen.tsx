@@ -1,11 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Image, ScrollView, Animated, Platform } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Image, ScrollView, Animated, Platform, Button, Modal, ActivityIndicator } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
-import { useNavigation } from '@react-navigation/native';
-import { accelerometer, gyroscope, SensorTypes, setUpdateIntervalForType } from 'react-native-sensors';
-import { Observable, Subscription } from 'rxjs';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { accelerometer, SensorTypes, setUpdateIntervalForType } from 'react-native-sensors';
+import { Subscription } from 'rxjs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import axios from 'axios';
+import { WebView } from 'react-native-webview';
+import storage from '@react-native-firebase/storage';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
+import CustomAlertModal from '../../Components/CustomAlertModal';
 
 
 // Define the types for our foot images
@@ -22,6 +27,15 @@ interface SensorData {
     timestamp: number;
 }
 
+// Add type definition for route params
+type FootScanScreenParams = {
+    customer: {
+        id: string;
+        // Add other customer properties as needed
+    };
+    RetailerId: string;
+};
+
 const FootScanScreen = () => {
     const [capturedImages, setCapturedImages] = useState<FootImage[]>([]);
     const [showPreview, setShowPreview] = useState(false);
@@ -30,11 +44,117 @@ const FootScanScreen = () => {
     const [currentFoot, setCurrentFoot] = useState<'left' | 'right'>('left');
     const [currentView, setCurrentView] = useState<'left' | 'right' | 'front'>('left');
     const [isOrientationCorrect, setIsOrientationCorrect] = useState(false);
+    const [isDetectingSheet, setIsDetectingSheet] = useState(false);
     const navigation = useNavigation();
     const { hasPermission, requestPermission } = useCameraPermission();
     const device = useCameraDevice('back');
     const camera = useRef<Camera>(null);
     const { width, height } = Dimensions.get('window');
+
+    const route = useRoute();
+    const { customer, RetailerId } = route.params as FootScanScreenParams;
+
+    // console.log(customer,RetailerId);
+
+
+    // volumental webview page
+    const [showWebView, setShowWebView] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const [alertModal, setAlertModal] = useState({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info' as 'success' | 'error' | 'info',
+    });
+
+    const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setAlertModal({
+            visible: true,
+            title,
+            message,
+            type,
+        });
+    };
+
+    const hideAlert = () => {
+        setAlertModal(prev => ({ ...prev, visible: false }));
+    };
+
+    const handleMessage = async (event: any) => {
+        const data = JSON.parse(event.nativeEvent.data);
+        console.log('Volumental Event:', data);
+
+        if (data.event === 'OnMeasurement') {
+            try {
+                // Get access token
+                const tokenResponse = await axios.post(
+                    'https://login.volumental.com/oauth/token',
+                    {
+                        grant_type: 'client_credentials',
+                        client_id: 'm2IiZHYiVDap31YxnSFbEMoB7MHoCTdW',
+                        client_secret: 'ZpoCZLIPFCFOKZh4wJmw6-xddJ1uzwVUoHf5eMjFMEPp5Kvh7G7QgLZEma0DzLiF',
+                        audience: 'https://stage-gateway.volumental.com'
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        }
+                    }
+                );
+
+                const accessToken = tokenResponse.data.access_token;
+
+                // Fetch scan data using the scan ID
+                const scanResponse = await axios.get(
+                    `https://widget.volumental.com/api/v1/scans/${data.data.id}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                        },
+                    }
+                );
+
+                const scanData = scanResponse.data;
+                const user = auth().currentUser;
+
+                if (!user) {
+                    throw new Error('User not authenticated');
+                }
+
+                // Check if measurements already exist and update instead of creating new
+                const measurementsRef = firestore()
+                    .collection('Retailers')
+                    .doc(RetailerId)
+                    .collection('measurements')
+                    .doc(customer.id);
+
+                await measurementsRef.set({
+                    scanId: data.data.id,
+                    createdAt: scanData.created_at,
+                    measurements: scanData.measurements,
+                    meshes: scanData.meshes,
+                    scanType: scanData.scan_type,
+                    success: scanData.success,
+                    storedAt: firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+
+
+            } catch (error) {
+                console.error('Error fetching/storing measurements:', error);
+                showAlert('Error', 'Failed to store measurements. Please try again.', 'error');
+            }
+        }
+
+        if (data.event === 'OnModalClosed') {
+            setShowWebView(false); // Close the WebView
+            // @ts-ignore - Navigation type issue
+            navigation.navigate('InsoleQuestions', {
+                customer: customer,
+                RetailerId: RetailerId
+            });
+        }
+    };
 
 
     const radToDeg = (rad: number) => {
@@ -50,7 +170,7 @@ const FootScanScreen = () => {
         z: 0
     });
 
-    // function for a4sheet detection from python server 
+    // function for a4sheet detection from python server ;
 
     async function sendImageForDetection(photoUri: string) {
         const formData = new FormData();
@@ -58,31 +178,31 @@ const FootScanScreen = () => {
             uri: Platform.OS === 'android' ? 'file://' + photoUri : photoUri,
             type: 'image/jpeg',
             name: 'photo.jpg',
-          });
-      
+        });
+
         try {
-          const response = await axios.post('http://192.168.83.30:5000/detect-sheet', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          });
-      
-          if (response.data.a4_detected) {
-            console.log('A4 Sheet Detected ✅');
-            return true;
-            // Proceed with saving image
-          } else {
-            Alert.alert('No A4 Sheet detected', 'Please retake the picture');
-            return false;
-          }
+            const response = await axios.post('https://myfootfirstserver.onrender.com/detect-sheet', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            if (response.data.a4_detected) {
+                console.log('A4 Sheet Detected ✅');
+                return true;
+                // Proceed with saving image
+            } else {
+                showAlert('No A4 Sheet detected', 'Please retake the picture', 'error');
+                return false;
+            }
         } catch (error) {
-          console.error(error); 
-          Alert.alert('Error', 'Something went wrong while detecting');
+            console.error(error);
+            showAlert('Error', 'Something went wrong while detecting', 'error');
         }
-      }
+    }
 
 
-    const checkOrientation = (x: number, y: number, z: number): boolean => {
+    const checkOrientation = useCallback((x: number, y: number, z: number): boolean => {
         // Calculate tilt angle using arctan2
         const tiltAngle = radToDeg(Math.atan2(x, z));
         const forwardTilt = radToDeg(Math.atan2(y, z));
@@ -97,7 +217,7 @@ const FootScanScreen = () => {
             isVertical,
             x,
             y,
-            z
+            z,
         });
 
         // Relaxed conditions for testing
@@ -132,13 +252,12 @@ const FootScanScreen = () => {
             default:
                 return false;
         }
-    };
+    }, [currentView, currentFoot]);
 
     useEffect(() => {
         let accelerometerSubscription: Subscription;
 
         const startSensorUpdates = async () => {
-            // Set sensor update interval (in milliseconds)
             setUpdateIntervalForType(SensorTypes.accelerometer, 100);
 
             accelerometerSubscription = accelerometer.subscribe(
@@ -155,12 +274,13 @@ const FootScanScreen = () => {
                 accelerometerSubscription.unsubscribe();
             }
         };
-    }, [currentView]); // Added currentView as dependency
+    }, [currentView, checkOrientation]); // Added checkOrientation as dependency
 
 
     const handleCapture = async () => {
         if (camera.current) {
             try {
+                setIsDetectingSheet(true);
                 console.log('Attempting to take photo...');
                 const photo = await camera.current.takePhoto({
                     flash: 'off',
@@ -169,21 +289,23 @@ const FootScanScreen = () => {
                 // Check for A4 sheet in the image
                 const a4Detected = await sendImageForDetection(photo.path);
                 if (!a4Detected) {
-                    Alert.alert('No A4 Sheet Detected', 'Please place your foot on an A4 sheet and try again.');
-                    return; 
+                    showAlert('No A4 Sheet Detected', 'Please place your foot on an A4 sheet and try again.', 'error');
+                    setIsDetectingSheet(false);
+                    return;
                 }
-    
-                setCurrentImage(photo.path);
 
+                setCurrentImage(photo.path);
                 setShowPreview(true);
-                Alert.alert('Success', 'Image captured successfully!');
+                showAlert('Success', 'Image captured successfully!', 'success');
             } catch (error) {
                 console.error('Error taking photo:', error);
-                Alert.alert('Error', 'Failed to capture image. Please try again.');
+                showAlert('Error', 'Failed to capture image. Please try again.', 'error');
+            } finally {
+                setIsDetectingSheet(false);
             }
         } else {
             console.error('Camera reference is null');
-            Alert.alert('Error', 'Camera not initialized. Please try again.');
+            showAlert('Error', 'Camera not initialized. Please try again.', 'error');
         }
     };
 
@@ -198,7 +320,7 @@ const FootScanScreen = () => {
             const newImage: FootImage = {
                 path: currentImage,
                 type: currentView,
-                foot: currentFoot
+                foot: currentFoot,
             };
             setCapturedImages((prev) => [...prev, newImage]);
         }
@@ -206,7 +328,7 @@ const FootScanScreen = () => {
         if (currentView === 'front') {
             if (currentFoot === 'right') {
                 // We've captured all images
-                Alert.alert('Complete', 'All foot images have been captured!');
+                showAlert('Complete', 'All foot images have been captured!', 'success');
                 setShowPreview(false);
                 setShowSummary(true);
             } else {
@@ -234,10 +356,93 @@ const FootScanScreen = () => {
         setCurrentView('left');
     };
 
-    const handleContinue = () => {
-        // Here you would navigate to the next screen or process the images
-        Alert.alert('Success', 'All images have been saved!');
-        navigation.goBack();
+    const handleContinue = async () => {
+        try {
+            setIsUploading(true);
+
+            if (!RetailerId) {
+                showAlert('Error', 'User not authenticated', 'error');
+                return;
+            }
+
+            const timestamp = new Date().getTime();
+            const uploadedImages = [];
+
+            // First, check for existing images
+            const existingImagesRef = firestore()
+                .collection('Retailers')
+                .doc(RetailerId)
+                .collection('scanned_images')
+                .orderBy('createdAt', 'desc')
+                .limit(1);
+
+            const existingImagesSnapshot = await existingImagesRef.get();
+            const existingImagesDoc = existingImagesSnapshot.docs[0];
+            const existingImages = existingImagesDoc?.data()?.images || [];
+
+            // Delete existing images from Firebase Storage
+            for (const existingImage of existingImages) {
+                try {
+                    const oldFilename = `${customer.id}/${existingImage.timestamp}_${existingImage.foot}_${existingImage.type}.jpg`;
+                    const oldReference = storage().ref(oldFilename);
+                    await oldReference.delete();
+                } catch (error) {
+                    console.warn('Error deleting old image:', error);
+                    // Continue with upload even if deletion fails
+                }
+            }
+
+            // Upload new images to Firebase Storage
+            for (const image of capturedImages) {
+                try {
+                    const filename = `${customer.id}/${timestamp}_${image.foot}_${image.type}.jpg`;
+                    const reference = storage().ref(filename);
+
+                    await reference.putFile(image.path);
+                    const url = await reference.getDownloadURL();
+
+                    uploadedImages.push({
+                        foot: image.foot,
+                        type: image.type,
+                        url: url,
+                        timestamp: timestamp,
+                    });
+                } catch (error) {
+                    console.error('Error uploading image:', error);
+                    throw new Error(`Failed to upload ${image.foot} foot ${image.type} view`);
+                }
+            }
+
+            // Update or create new document in Firestore
+            if (existingImagesDoc) {
+                // Update existing document
+                await existingImagesDoc.ref.update({
+                    images: uploadedImages,
+                    updatedAt: firestore.FieldValue.serverTimestamp(),
+                    status: 'completed',
+                });
+            } else {
+                // Create new document
+                await firestore()
+                    .collection('Retailers')
+                    .doc(RetailerId)
+                    .collection('scanned_images')
+                    .doc(customer.id)
+                    .set({
+                        images: uploadedImages,
+                        createdAt: firestore.FieldValue.serverTimestamp(),
+                        status: 'completed',
+                    });
+            }
+
+            showAlert('Success', 'All images have been updated successfully!', 'success');
+            setShowWebView(true);
+        } catch (error) {
+            console.error('Error in handleContinue:', error);
+            showAlert('Error', 'Failed to upload images. Please try again.', 'error');
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     // Calculate the rotation angle for the movable rectangle
@@ -254,7 +459,7 @@ const FootScanScreen = () => {
         let dy = 0;
         const SENSITIVITY_X = 40;
         const SENSITIVITY_Y = 40;
- 
+
         // When aligned, ensure perfect overlap
         if (isAligned) {
             // Calculate the exact position to match the target rectangle
@@ -332,17 +537,7 @@ const FootScanScreen = () => {
                         {currentView === 'left' ? 'Outside' : currentView === 'right' ? 'Inside' : 'Top'} view
                     </Text>
                 </View>
-                {/* <Text style={styles.instructionText}>
-                    {getOrientationInstructions()}
-                </Text> */}
-                {/* Debug info */}
-                {/* <View style={styles.debugInfo}>
-                    <Text style={styles.debugText}>Tilt: {debugInfo.tiltAngle.toFixed(1)}°</Text>
-                    <Text style={styles.debugText}>Forward: {debugInfo.forwardTilt.toFixed(1)}°</Text>
-                    <Text style={styles.debugText}>X: {debugInfo.x.toFixed(2)}</Text>
-                    <Text style={styles.debugText}>Y: {debugInfo.y.toFixed(2)}</Text>
-                    <Text style={styles.debugText}>Z: {debugInfo.z.toFixed(2)}</Text>
-                </View> */}
+
             </View>
         );
     };
@@ -366,7 +561,7 @@ const FootScanScreen = () => {
                         <TouchableOpacity
                             style={[styles.saveButton]}
                             onPress={handleSave}
-                            // disabled={!isOrientationCorrect}
+                        // disabled={!isOrientationCorrect}
                         >
                             <Text style={styles.buttonText}>Save</Text>
                         </TouchableOpacity>
@@ -392,11 +587,16 @@ const FootScanScreen = () => {
                     </View>
                 </View>
                 <TouchableOpacity
-                    style={[styles.captureButton, !isOrientationCorrect && styles.disabledButton]}
+                    style={[
+                        styles.captureButton,
+                        (!isOrientationCorrect || isDetectingSheet) && styles.disabledButton
+                    ]}
                     onPress={handleCapture}
-                    disabled={!isOrientationCorrect}
+                    disabled={!isOrientationCorrect || isDetectingSheet}
                 >
-                    <Text style={styles.captureText}>Capture</Text>
+                    <Text style={styles.captureText}>
+                        {isDetectingSheet ? 'Detecting...' : 'Capture'}
+                    </Text>
                 </TouchableOpacity>
             </View>
         );
@@ -404,55 +604,55 @@ const FootScanScreen = () => {
 
     const renderProgress = () => {
         return (
-           <SafeAreaProvider>
-             <View style={styles.progressContainer}>
-                <Text style={styles.progressTitle}>Capture Progress:</Text>
-                <View style={styles.progressGrid}>
-                    <View style={styles.progressColumn}>
-                        <Text style={styles.footLabel}>Left Foot</Text>
-                        <View style={[
-                            styles.progressItem,
-                            capturedImages.some(img => img.foot === 'left' && img.type === 'left') ? styles.completed : {}
-                        ]}>
-                            <Text style={styles.progressText}>Left View</Text>
+            <SafeAreaProvider>
+                <View style={styles.progressContainer}>
+                    <Text style={styles.progressTitle}>Capture Progress:</Text>
+                    <View style={styles.progressGrid}>
+                        <View style={styles.progressColumn}>
+                            <Text style={styles.footLabel}>Left Foot</Text>
+                            <View style={[
+                                styles.progressItem,
+                                capturedImages.some(img => img.foot === 'left' && img.type === 'left') ? styles.completed : {}
+                            ]}>
+                                <Text style={styles.progressText}>Left View</Text>
+                            </View>
+                            <View style={[
+                                styles.progressItem,
+                                capturedImages.some(img => img.foot === 'left' && img.type === 'right') ? styles.completed : {}
+                            ]}>
+                                <Text style={styles.progressText}>Right View</Text>
+                            </View>
+                            <View style={[
+                                styles.progressItem,
+                                capturedImages.some(img => img.foot === 'left' && img.type === 'front') ? styles.completed : {}
+                            ]}>
+                                <Text style={styles.progressText}>Front View</Text>
+                            </View>
                         </View>
-                        <View style={[
-                            styles.progressItem,
-                            capturedImages.some(img => img.foot === 'left' && img.type === 'right') ? styles.completed : {}
-                        ]}>
-                            <Text style={styles.progressText}>Right View</Text>
-                        </View>
-                        <View style={[
-                            styles.progressItem,
-                            capturedImages.some(img => img.foot === 'left' && img.type === 'front') ? styles.completed : {}
-                        ]}>
-                            <Text style={styles.progressText}>Front View</Text>
-                        </View>
-                    </View>
-                    <View style={styles.progressColumn}>
-                        <Text style={styles.footLabel}>Right Foot</Text>
-                        <View style={[
-                            styles.progressItem,
-                            capturedImages.some(img => img.foot === 'right' && img.type === 'left') ? styles.completed : {}
-                        ]}>
-                            <Text style={styles.progressText}>Left View</Text>
-                        </View>
-                        <View style={[
-                            styles.progressItem,
-                            capturedImages.some(img => img.foot === 'right' && img.type === 'right') ? styles.completed : {}
-                        ]}>
-                            <Text style={styles.progressText}>Right View</Text>
-                        </View>
-                        <View style={[
-                            styles.progressItem,
-                            capturedImages.some(img => img.foot === 'right' && img.type === 'front') ? styles.completed : {}
-                        ]}>
-                            <Text style={styles.progressText}>Front View</Text>
+                        <View style={styles.progressColumn}>
+                            <Text style={styles.footLabel}>Right Foot</Text>
+                            <View style={[
+                                styles.progressItem,
+                                capturedImages.some(img => img.foot === 'right' && img.type === 'left') ? styles.completed : {}
+                            ]}>
+                                <Text style={styles.progressText}>Left View</Text>
+                            </View>
+                            <View style={[
+                                styles.progressItem,
+                                capturedImages.some(img => img.foot === 'right' && img.type === 'right') ? styles.completed : {}
+                            ]}>
+                                <Text style={styles.progressText}>Right View</Text>
+                            </View>
+                            <View style={[
+                                styles.progressItem,
+                                capturedImages.some(img => img.foot === 'right' && img.type === 'front') ? styles.completed : {}
+                            ]}>
+                                <Text style={styles.progressText}>Front View</Text>
+                            </View>
                         </View>
                     </View>
                 </View>
-            </View>
-           </SafeAreaProvider>
+            </SafeAreaProvider>
         );
     };
 
@@ -495,12 +695,43 @@ const FootScanScreen = () => {
                     </View>
                 </ScrollView>
                 <View style={styles.summaryButtons}>
-                    <TouchableOpacity style={styles.restartButton} onPress={handleRestart}>
+                    <TouchableOpacity
+                        style={styles.restartButton}
+                        onPress={handleRestart}
+                        disabled={isUploading}
+                    >
                         <Text style={styles.buttonText}>Restart</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-                        <Text style={styles.buttonText}>Continue</Text>
+                    <TouchableOpacity
+                        style={[
+                            styles.continueButton,
+                            isUploading && styles.disabledButton
+                        ]}
+                        onPress={handleContinue}
+                        disabled={isUploading}
+                    >
+                        {isUploading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator color="white" />
+                                <Text style={[styles.buttonText, styles.loadingText]}>Uploading...</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.buttonText}>Continue</Text>
+                        )}
                     </TouchableOpacity>
+
+                    <Modal visible={showWebView} animationType="slide">
+                        <WebView
+                            source={{ uri: 'file:///android_asset/volumental.html' }}
+                            originWhitelist={['*']}
+                            style={{ flex: 1 }}
+                            onMessage={handleMessage}
+                            javaScriptEnabled={true}
+                            allowsInlineMediaPlayback={true}
+                            mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+                        />
+                        <Button title="Close" onPress={() => setShowWebView(false)} />
+                    </Modal>
                 </View>
             </View>
         );
@@ -544,9 +775,16 @@ const FootScanScreen = () => {
             <TouchableOpacity
                 style={styles.nextButton}
                 onPress={() => navigation.goBack()}
-                >
-                <Text style={styles.nextText}>Next</Text>
+            >
+                <Text style={styles.nextText}>Cancel</Text>
             </TouchableOpacity>
+            <CustomAlertModal
+                visible={alertModal.visible}
+                title={alertModal.title}
+                message={alertModal.message}
+                type={alertModal.type}
+                onClose={hideAlert}
+            />
         </View>
     );
 };
@@ -706,7 +944,7 @@ const styles = StyleSheet.create({
         width: 100,
         height: 30,
         backgroundColor: '#ddd',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 5,
         borderRadius: 5,
@@ -861,6 +1099,14 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         textAlign: 'center',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginLeft: 10,
     },
 });
 

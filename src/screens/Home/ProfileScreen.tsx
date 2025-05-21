@@ -15,8 +15,8 @@ type RootStackParamList = {
   MainTabs: undefined;
   Home: undefined;
   Cart: undefined;
+  Messaging: undefined;
   OrderHistory: undefined;
-  Messages: undefined;
   ReferralCode: undefined;
   EmployeeLogin: undefined;
 };
@@ -30,38 +30,39 @@ const ProfileScreen = () => {
     navigation.navigate(screen);
   };
 
-  const onLogout = async() => {
-   
-      try {
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
-    
-        if (currentUser) {
-          // Firebase Auth user
-          await auth.signOut();
-          setUserData(null);
-          console.log('Firebase user signed out successfully');
-        } else {
-          // Employee user via AsyncStorage
-          await AsyncStorage.removeItem('loggedInEmployee');
-          await AsyncStorage.setItem('isEmployeeLoggedIn', 'false');
-          setIsLoggedIn(false);
-          setUserData(null);
-          console.log('Employee logged out successfully');
-        }
-    
-        // Navigate to AuthStack or reset navigation
-        // navigation.reset({
-        //   index: 0,
-        //   routes: [{ name: 'Welcome' }], // or whatever your first auth screen is
-        // });
-        
-        // The RootNavigator will automatically redirect to AuthStack
-        // which contains the Welcome screen as its first screen
-      } catch (error) {
-        console.error('Error signing out:', error);
+  const onLogout = async () => {
+
+    try {
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      if (currentUser) {
+        // Firebase Auth user
+        await auth.signOut();
+        setUserData(null);
+        console.log('Firebase user signed out successfully');
+      } else {
+        // Employee user via AsyncStorage
+        await AsyncStorage.removeItem('loggedInEmployee');
+        await AsyncStorage.setItem('isEmployeeLoggedIn', 'false');
+        await AsyncStorage.removeItem('Retailerid');
+        setIsLoggedIn(false);
+        setUserData(null);
+        console.log('Employee logged out successfully');
       }
-    };
+
+      // Navigate to AuthStack or reset navigation
+      // navigation.reset({
+      //   index: 0,
+      //   routes: [{ name: 'Welcome' }], // or whatever your first auth screen is
+      // });
+
+      // The RootNavigator will automatically redirect to AuthStack
+      // which contains the Welcome screen as its first screen
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -69,43 +70,43 @@ const ProfileScreen = () => {
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>{userData?.businessName ? `${userData.businessName}` : `${userData?.name}` ? `${userData?.name}` : "User"}</Text>
-            <Text style={styles.emailText}>{user? user?.email : userData?.email}</Text>
+            <Text style={styles.emailText}>{user ? user?.email : userData?.email}</Text>
           </View>
 
           <View style={styles.menuContainer}>
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              // onPress={() => handleNavigation('ReferralCode')}
+            <TouchableOpacity
+              style={styles.menuItem}
+            // onPress={() => handleNavigation('ReferralCode')}
             >
               <Text style={styles.menuItemText}>Advertise Your Business</Text>
             </TouchableOpacity>
-            
-            
-           
-            
-            <TouchableOpacity 
-              style={styles.menuItem} 
-              // onPress={() => handleNavigation('Messages')}
+
+
+
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleNavigation('Messaging')}
             >
               <Text style={styles.menuItemText}>Messaging</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => handleNavigation('OrderHistory')}
             >
               <Text style={styles.menuItemText}>My Foot First Subscription Managment</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => handleNavigation('OrderHistory')}
             >
               <Text style={styles.menuItemText}>Retiler ID : {userData?.RetailerId}</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.menuItem, styles.logoutItem]} 
+
+            <TouchableOpacity
+              style={[styles.menuItem, styles.logoutItem]}
               onPress={onLogout}
             >
               <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>

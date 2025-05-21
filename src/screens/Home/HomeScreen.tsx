@@ -4,25 +4,30 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Dimensions,
   TouchableOpacity,
   StatusBar as RNStatusBar,
 } from "react-native";
-import { Card, Button } from "react-native-paper";
+import { Button } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import FootDiagram from "../../Components/FootDiagram";
+import { getAuth } from '@react-native-firebase/auth';
 import { useUser } from "../../contexts/UserContext";
-// import FootScanScreen from './FootScanScreen'
+import CustomAlertModal from "../../Components/CustomAlertModal";
+import CustomerDetailsModal from "../../Components/CustomerDetailsModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import firestore from '@react-native-firebase/firestore';
 
-const { width } = Dimensions.get("window");
-
-type Product = {
+type Customer = {
   id: string;
-  price: string;
-  title: string;
-  image: any;
+  firstName: string;
+  lastName: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  country: string;
+  phoneNumber: string;
 };
 
 // Define the navigation types
@@ -30,7 +35,7 @@ type RootStackParamList = {
   Home: undefined;
   FootScanScreen: undefined;
   InsoleQuestions: undefined;
-  OrthoticSale: undefined;
+  OrthoticSale: { customer: Customer; retailerId: string };
   Volumental: undefined;
 };
 
@@ -41,32 +46,35 @@ const HomeScreen = () => {
   const { userData } = useUser();
   const [selectedFoot, setSelectedFoot] = useState<"left" | "right">("left");
   const [painPoints, setPainPoints] = useState<string[]>([]);
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      price: "$49.99",
-      title: "Insole 1",
-      image: require("../../assets/images/banner1.jpg"),
-    },
-    {
-      id: "2",
-      price: "$59.99",
-      title: "Insole 2",
-      image: require("../../assets/images/banner2.webp"),
-    },
-    {
-      id: "3",
-      price: "$39.99",
-      title: "Insole 3",
-      image: require("../../assets/images/banner3.jpeg"),
-    },
-    {
-      id: "4",
-      price: "$39.99",
-      title: "Insole 4",
-      image: require("../../assets/images/banner3.jpeg"),
-    },
-  ]);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [customerModalVisible, setCustomerModalVisible] = useState(false);
+  const [RetailerId, setRetailerId] = useState("")
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  useEffect(() => {
+    const findRetailerId = async () => {
+      const isEmployeeLoggedIn = await AsyncStorage.getItem('isEmployeeLoggedIn');
+
+      if (isEmployeeLoggedIn) {
+        const storedRetailerId = await AsyncStorage.getItem('RetailerId');
+        if (storedRetailerId) {
+          setRetailerId(storedRetailerId);
+        }
+      } else if (userData?.RetailerId) {
+        setRetailerId(userData.RetailerId.toString());
+      }
+    }
+
+    findRetailerId()
+  }, [userData])
 
   const handlePainPointSelection = (pointId: string) => {
     setPainPoints((prev) =>
@@ -76,21 +84,107 @@ const HomeScreen = () => {
     );
   };
 
-  console.log(userData);
-  
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertConfig({ title, message, type });
+    setAlertVisible(true);
+  };
+
+  const handleScanFoot = async () => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (!user) {
+        showAlert('Error', 'User not logged in', 'error');
+        return;
+      }
+
+      setCustomerModalVisible(true);
+    } catch (error) {
+      showAlert('Error', 'Failed to proceed with scan', 'error');
+    }
+  };
+
+  const checkRetailerSubscription = async (retailerId: string) => {
+    try {
+      const retailerDoc = await firestore()
+        .collection('Retailers')
+        .doc(retailerId)
+        .get();
+
+      const retailerData = retailerDoc.data();
+      return retailerData?.Paid === true;
+    } catch (error) {
+      console.error('Error checking retailer subscription:', error);
+      return false;
+    }
+  };
+
+  const handleCustomerSelect = async (customer: Customer) => {
+    setCustomerModalVisible(false);
+
+    if (!RetailerId) {
+      showAlert('Error', 'Retailer ID not found', 'error');
+      return;
+    }
+
+    try {
+      const hasSubscription = await checkRetailerSubscription(RetailerId);
+
+      if (hasSubscription) {
+        navigation.navigate("FootScanScreen",{customer, RetailerId});
+      } else {
+        navigation.navigate("OrthoticSale", { customer, RetailerId });
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to check subscription status', 'error');
+    }
+  };
+
+  const handleNewCustomerSubmit = async (customer: Customer) => {
+    if (!RetailerId) {
+      showAlert('Error', 'Retailer ID not found', 'error');
+      return;
+    }
+
+    try {
+      const hasSubscription = await checkRetailerSubscription(RetailerId);
+
+      if (hasSubscription) {
+        navigation.navigate("FootScanScreen",{customer,RetailerId});
+      } else {
+        navigation.navigate("OrthoticSale", { customer, retailerId: RetailerId });
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to check subscription status', 'error');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
+      <CustomAlertModal
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertVisible(false)}
+      />
+      <CustomerDetailsModal
+        visible={customerModalVisible}
+        onClose={() => setCustomerModalVisible(false)}
+        onCustomerSelect={handleCustomerSelect}
+        onNewCustomerSubmit={handleNewCustomerSubmit}
+      />
       <RNStatusBar backgroundColor="#000000" translucent={true} />
       <ScrollView>
         <View style={styles.header}>
-          <Text style={styles.username}>Hi, {userData?.contactFirstName ? `${userData.contactFirstName} ${userData.contactLastName}` : `${userData?.name}` ? `${userData?.name}` : "User"}</Text>
+          <Text style={styles.username}>Hi, {userData?.contactFirstName || 'User'}</Text>
         </View>
 
         <View style={styles.fitCheckContainer}>
           <Text style={styles.fitCheckTitle}>Start Your Personal Fit Check </Text>
           <Text style={styles.fitCheckDescription}>Takes just a few minutes — we guide you step by step. The more info you give, the better we match your insoles. You can skip
-          some steps if you prefer.</Text>
+            some steps if you prefer.</Text>
 
 
           <View style={styles.painSection}>
@@ -132,40 +226,13 @@ const HomeScreen = () => {
               mode="contained"
               style={styles.nextButton}
               // onPress={() => navigation.navigate("OrthoticSale")}
-              onPress={() => navigation.navigate("Volumental")}
+              // onPress={() => navigation.navigate("Volumental")}
+              onPress={handleScanFoot}
             >
               <Text style={styles.buttonText}>Scan Your Foot</Text>
             </Button>
           </View>
         </View>
-
-        {/* <View style={styles.recommendationsContainer}>
-          <Text style={styles.recommendationsTitle}>Recommendations for You</Text>
-
-          <View style={styles.gridContainer}>
-            {products.map((product) => (
-              <View key={product.id} style={styles.gridItem}>
-                <Card style={styles.productCard}>
-                  <Card.Cover source={product.image} style={styles.productImage} />
-                  <Card.Content style={styles.productContent}>
-                    <View style={styles.productTitleRow}>
-                      <Text style={styles.productTitle}>{product.title}</Text>
-                      <Text style={styles.productPrice}>{product.price}</Text>
-                    </View>
-                  </Card.Content>
-                </Card>
-              </View>
-            ))}
-          </View>
-
-          <Button
-            mode="outlined"
-            style={styles.showAllButton}
-            onPress={() => navigation.navigate("InsoleQuestions")}
-          >
-            <Text style={styles.showAllButtonText}>Show All</Text>
-          </Button>
-        </View> */}
       </ScrollView>
 
       <View style={styles.stepIndicatorContainer}>
@@ -194,7 +261,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
   },
   username: {
-    fontFamily:"OpenSans-Light",
+    fontFamily: "OpenSans-Light",
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",

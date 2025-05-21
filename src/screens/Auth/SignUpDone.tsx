@@ -13,47 +13,62 @@ import {
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
 import { getAuth } from '@react-native-firebase/auth';
 import { getFirestore } from '@react-native-firebase/firestore';
+import CustomAlertModal from '../../Components/CustomAlertModal';
 
-const SignUpDone = ({route}:{route:any}) => {
+const SignUpDone = ({ route }: { route: any }) => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    title: '',
+    message: '',
+    type: 'info',
+  });
 
-  const [businessName, setBusinessName] = useState(route.params.businessName);
-  const [businessType, setBusinessType] = useState(route.params.businessType);
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertConfig({ title, message, type });
+    setAlertVisible(true);
+  };
 
-  const [contactFirstName, setContactFirstName] = useState(route.params.contactFirstName);
-  const [contactLastName, setContactLastName] = useState(route.params.contactLastName);
-  const [contactRole, setContactRole] = useState(route.params.contactRole);
-  const [email, setEmail] = useState(route.params.email);
-  const [password, setPassword] = useState(route.params.password);
-
-  const [address, setAddress] = useState(route.params.address);
-  const [city, setCity] = useState(route.params.city);
-  const [state, setState] = useState(route.params.state);
-  const [postalCode, setPostalCode] = useState(route.params.postalCode);
-  const [countryCode, setCountryCode] = useState(route.params.countryCode);
-  const [callingCode, setCallingCode] = useState(route.params.callingCode);
-  const [country, setCountry] = useState(route.params.country);
-  const [phone, setPhone] = useState(route.params.phone);
+  // Store route params without setters since they're not modified
+  const {
+    businessName,
+    businessType,
+    contactFirstName,
+    contactLastName,
+    contactRole,
+    email,
+    password,
+    address,
+    city,
+    state,
+    postalCode,
+    countryCode,
+    callingCode,
+    country,
+    phone,
+  } = route.params;
 
   const [monthlyVolume, setMonthlyVolume] = useState('');
   const [sellsOrthotics, setSellsOrthotics] = useState('');
   const [showOrthopticsDropdown, setShowOrthopticsDropdown] = useState(false);
 
-
-
   const validateForm = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!businessName || !businessType || !contactFirstName || !contactLastName || !contactRole || !email || !password || !address || !city || !state || !postalCode || !country || !monthlyVolume || !sellsOrthotics) {
-      Alert.alert("Validation Error", "All required fields must be filled.");
+      showAlert("Validation Error", "All required fields must be filled.", 'error');
       return false;
     }
     if (!emailRegex.test(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      showAlert("Invalid Email", "Please enter a valid email address.", 'error');
       return false;
     }
     if (password.length < 6) {
-      Alert.alert("Weak Password", "Password must be at least 6 characters.");
+      showAlert("Weak Password", "Password must be at least 6 characters.", 'error');
       return false;
     }
 
@@ -61,41 +76,18 @@ const SignUpDone = ({route}:{route:any}) => {
   };
 
   const handleSubmit = async () => {
-    // Validate form before proceeding
     if (!validateForm()) return;
-  
-    try {
-      
-      const RetailerId = businessName.toLowerCase()
-      console.log("Generated RetailerId:", RetailerId);
 
-    //   console.log(
-    //           businessName,
-    //           businessType,
-    //           contactFirstName,
-    //           contactLastName,
-    //           contactRole,
-    //           email,
-    //           address,
-    //           city,
-    //           state,
-    //           postalCode,
-    //           country,
-    //           countryCode,
-    //           phone,
-    //           callingCode,
-    //           monthlyVolume,
-    //           sellsOrthotics,
-    //           RetailerId);
-      
+    try {
+      const RetailerId = businessName.toLowerCase();
+
       // Create user authentication account
       const userCredential = await getAuth().createUserWithEmailAndPassword(email, password);
 
-
-      const db = getFirestore();  
+      const db = getFirestore();
       // Create retailer profile in Firestore
-       db.collection('Retailers')
-        .doc(RetailerId) 
+      await db.collection('Retailers')
+        .doc(RetailerId)
         .set({
           uid: userCredential.user.uid,
           businessName,
@@ -114,97 +106,103 @@ const SignUpDone = ({route}:{route:any}) => {
           callingCode,
           monthlyVolume,
           sellsOrthotics,
-          RetailerId
-        })
+          RetailerId,
+          createdAt:new Date(),
+        });
 
-      Alert.alert(
-        "Registration Successful", 
-        "Your business account has been created successfully!"
+      showAlert(
+        "Registration Successful",
+        "Your business account has been created successfully!",
+        'success'
       );
-      
-      // Navigate to next screen
-      
+
+      // TODO: Add navigation after successful registration
+      // navigation.navigate('NextScreen');
+
     } catch (error) {
-      console.error('Error during registration:', error);
-      Alert.alert("Registration Failed", (error as Error).message);
+      showAlert("Registration Failed", (error as Error).message, 'error');
     }
   };
 
+  // Handle orthoptics selection
+  const handleOrthopticsSelect = (selection: string) => {
+    setSellsOrthotics(selection);
+    setShowOrthopticsDropdown(false);
+  };
 
-
-// Handle orthoptics selection
-const handleOrthopticsSelect = (selection: string) => {
-  setSellsOrthotics(selection);
-  setShowOrthopticsDropdown(false);
-};
-
-return (
-  <SafeAreaView style={styles.safeArea}>
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Business Information</Text>
-
-     
-      <TextInput
-        placeholder="Average Monthly Footfall/Patient Volume*"
-        placeholderTextColor="#999"
-        style={styles.input}
-        keyboardType="numeric"
-        value={monthlyVolume}
-        onChangeText={setMonthlyVolume}
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <CustomAlertModal
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertVisible(false)}
       />
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Business Information</Text>
 
-      {/* Sell Orthotics Dropdown */}
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => setShowOrthopticsDropdown(true)}
-      >
-        <Text style={sellsOrthotics ? styles.inputText : styles.placeholderText}>
-          {sellsOrthotics ? `Currently Sell Orthotics: ${sellsOrthotics}` : 'Do You Currently Sell Orthotics?*'}
-        </Text>
-      </TouchableOpacity>
+        <TextInput
+          placeholder="Average Monthly Footfall/Patient Volume*"
+          placeholderTextColor="#999"
+          style={styles.input}
+          keyboardType="numeric"
+          value={monthlyVolume}
+          onChangeText={setMonthlyVolume}
+        />
 
-      {/* Sell Orthotics Modal */}
-      <Modal
-        visible={showOrthopticsDropdown}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowOrthopticsDropdown(false)}
-      >
+        {/* Sell Orthotics Dropdown */}
         <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowOrthopticsDropdown(false)}
+          style={styles.input}
+          onPress={() => setShowOrthopticsDropdown(true)}
         >
-          <View style={styles.dropdownContainer}>
-            <Text style={styles.dropdownTitle}>Do You Currently Sell Orthotics?</Text>
-            <TouchableOpacity
-              style={styles.dropdownOption}
-              onPress={() => handleOrthopticsSelect('Yes')}
-            >
-              <Text style={styles.dropdownOptionText}>Yes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dropdownOption}
-              onPress={() => handleOrthopticsSelect('No')}
-            >
-              <Text style={styles.dropdownOptionText}>No</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dropdownCancelButton}
-              onPress={() => setShowOrthopticsDropdown(false)}
-            >
-              <Text style={styles.dropdownCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={sellsOrthotics ? styles.inputText : styles.placeholderText}>
+            {sellsOrthotics ? `Currently Sell Orthotics: ${sellsOrthotics}` : 'Do You Currently Sell Orthotics?*'}
+          </Text>
         </TouchableOpacity>
-      </Modal>
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Continue</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  </SafeAreaView>
-);
+        {/* Sell Orthotics Modal */}
+        <Modal
+          visible={showOrthopticsDropdown}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowOrthopticsDropdown(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowOrthopticsDropdown(false)}
+          >
+            <View style={styles.dropdownContainer}>
+              <Text style={styles.dropdownTitle}>Do You Currently Sell Orthotics?</Text>
+              <TouchableOpacity
+                style={styles.dropdownOption}
+                onPress={() => handleOrthopticsSelect('Yes')}
+              >
+                <Text style={styles.dropdownOptionText}>Yes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dropdownOption}
+                onPress={() => handleOrthopticsSelect('No')}
+              >
+                <Text style={styles.dropdownOptionText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dropdownCancelButton}
+                onPress={() => setShowOrthopticsDropdown(false)}
+              >
+                <Text style={styles.dropdownCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>Continue</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
 };
 
 const styles = StyleSheet.create({

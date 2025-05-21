@@ -1,0 +1,39 @@
+<html style="margin: 0; padding: 0">
+  <head>
+    <meta name="viewport" content="width=device-width" />
+
+    <script
+      async
+      src="https://js.volumental.com/sdk/v1/volumental.js"
+      data-client-id="e294e60a-b479-448a-9755-cb1816515cbe"
+    ></script>
+  </head>
+  <body style="margin: 0; padding: 0">
+    <volumental-measurement-embedded
+      id="volumental-widget-identifier"
+    ></volumental-measurement-embedded>
+    <script>
+
+      // Function the send message back to parent application.
+      const postMessage = message => {
+        if (window?.ReactNativeWebView?.postMessage) {
+          window.ReactNativeWebView.postMessage(message);
+        } else {
+          console.log(message);
+          console.log("hello")
+        }
+      };
+
+       // Register Volumental sdk event handlers.
+      const element = document.getElementById('volumental-widget-identifier');
+      element.addEventListener('volumental:on-measurement', (e) => {
+        const { id } = e.detail;
+        postMessage(JSON.stringify({event: 'OnMeasurement', data: { id }}));
+      });
+
+      element.addEventListener('volumental:on-closed', (e) => {
+        postMessage(JSON.stringify({event: 'OnModalClosed', data: undefined}));
+      });
+    </script>
+  </body>
+</html>

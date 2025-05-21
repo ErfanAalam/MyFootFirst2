@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   welcomeText: { fontSize: 16, color: '#212121' },
   companyName: { fontSize: 24, fontWeight: 'bold', color: '#00843D' },
   banner: { width: bannerWidth, marginRight: 20, alignItems: 'center' },
-  bannerImage: { width: '100%', height: 350, borderRadius: 20 },
+  bannerImage: { width: '100%', height: 300, borderRadius: 20 },
   bannerTextContainer: {
     // position: 'absolute',
     bottom: -60,

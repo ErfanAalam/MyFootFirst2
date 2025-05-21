@@ -495,6 +495,7 @@ const Dashboard = () => {
                                     placeholder="Employee Name"
                                     value={employeeName}
                                     onChangeText={setEmployeeName}
+                                    placeholderTextColor="#000"
                                 />
 
                                 <TextInput
@@ -503,6 +504,7 @@ const Dashboard = () => {
                                     value={employeeEmail}
                                     onChangeText={setEmployeeEmail}
                                     keyboardType="email-address"
+                                    placeholderTextColor="#000"
                                 />
 
                                 <TextInput
@@ -510,6 +512,7 @@ const Dashboard = () => {
                                     placeholder="Employee Role"
                                     value={employeeRole}
                                     onChangeText={setEmployeeRole}
+                                    placeholderTextColor="#000"
                                 />
 
                                 <TouchableOpacity onPress={handleConfirm} style={styles.confirmButton}>
@@ -589,7 +592,7 @@ const styles = StyleSheet.create({
     tableCell: {
         flex: 1,
         fontSize: 14,
-        color: '#333',
+        color: '#000',
     },
     markupInput: {
         flex: 1,

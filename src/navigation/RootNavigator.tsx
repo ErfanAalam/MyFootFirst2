@@ -17,6 +17,7 @@ import ShoesSize from '../screens/Home/ShoesSize';
 import { useUser } from '../contexts/UserContext';
 import OrthoticSale from '../screens/Home/OrthoticSale';
 import VolumentalScreen from '../Volumental/VolumentalScreen';
+import Messaging from '../screens/Home/Messaging';
 const Stack = createNativeStackNavigator();
 
 const RootNavigator = () => {
@@ -79,6 +80,7 @@ const RootNavigator = () => {
             <Stack.Screen name="ShoesSize" component={ShoesSize}/>
             <Stack.Screen name="OrthoticSale" component={OrthoticSale}/>
             <Stack.Screen name="Volumental" component={VolumentalScreen}/>
+            <Stack.Screen name="Messaging" component={Messaging}/>
           </Stack.Navigator>
         ) : (
           <AuthStack />

@@ -6,7 +6,7 @@
   },
   "client": [
     {
-      "client_info": {
+     "client_info": {
         "mobilesdk_app_id": "1:503667392757:android:69477cc16d31fe900ac5bc",
         "android_client_info": {
           "package_name": "com.myfootfirst2"

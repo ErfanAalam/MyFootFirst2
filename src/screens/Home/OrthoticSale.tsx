@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,49 @@ import {
   ScrollView,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5'; // Make sure to install: npm install react-native-vector-icons
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import axios from 'axios';
+import WebView from 'react-native-webview';
+import firestore from '@react-native-firebase/firestore';
+
+type RootStackParamList = {
+  OrthoticSale: {
+    customer: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      addressLine1: string;
+      addressLine2: string;
+      city: string;
+      country: string;
+      phoneNumber: string;
+    };
+    RetailerId: string;
+  };
+};
+
+type OrthoticSaleRouteProp = RouteProp<RootStackParamList, 'OrthoticSale'>;
+
+type Plan = {
+  id: string;
+  name: string;
+  price: string;
+  discount: string | null;
+  popular: boolean;
+  bestValue: boolean;
+};
 
 const OrthoticSale = () => {
   const navigation = useNavigation();
+  const route = useRoute<OrthoticSaleRouteProp>();
+  const {customer, RetailerId } = route.params;
   const [selectedPlan, setSelectedPlan] = useState('6-month');
-  
+  const [checkoutUrl, setCheckoutUrl] = useState('');
+  const [_loading, setLoading] = useState(false);
+
   const plans = [
     {
       id: '1-month',
@@ -23,7 +58,7 @@ const OrthoticSale = () => {
       price: '€50',
       discount: null,
       popular: false,
-      bestValue: false
+      bestValue: false,
     },
     {
       id: '6-month',
@@ -42,8 +77,8 @@ const OrthoticSale = () => {
       bestValue: true
     }
   ];
-  
-  const renderPlanBadge = (plan) => {
+
+  const renderPlanBadge = (plan: Plan) => {
     if (plan.popular) {
       return (
         <View style={styles.popularBadge}>
@@ -61,21 +96,75 @@ const OrthoticSale = () => {
     return null;
   };
 
+  const handlePayNow = async () => {
+    const userPlan = plans.filter((plan) => plan.id.includes(selectedPlan));
+    // console.log(userPlan[0]);
+    const Price = userPlan[0].price.replace('€', '');
+    setLoading(true);
+    try {
+      const response = await axios.post('https://myfootfirstserver.onrender.com/create-checkout-session', {
+        name: userPlan[0].name,
+        price: Price,
+      });
+
+      setCheckoutUrl(response.request.responseURL);
+    } catch (error) {
+      console.error('Error creating Stripe session:', error);
+      Alert.alert('Error', 'Failed to initiate checkout', [{ text: 'OK' }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNavigationStateChange = useCallback(async (navState: { url: string }) => {
+    console.log(RetailerId);
+    if ((navState.url.includes('/success') || navState.url.includes('?success=true'))) {
+      try {
+        // return;
+
+        await firestore()
+          .collection('Retailers')
+          .doc(RetailerId)
+          .set({ Paid: true }, { merge: true });
+
+
+        navigation.navigate('FootScanScreen',{customer, RetailerId});
+      } catch (error) {
+        console.error('Error saving order:', error);
+        Alert.alert('Error', 'Failed to save order details', [{ text: 'OK' }]);
+      }
+    } else if (navState.url.includes('/cancel') || navState.url.includes('?canceled=true')) {
+      Alert.alert('Payment Canceled', 'Your payment was canceled.', [{ text: 'OK' }]);
+      setCheckoutUrl('');
+    }
+  }, [RetailerId, selectedPlan, navigation]);
+
+  if (checkoutUrl) {
+    return (
+      <SafeAreaView style={{ flex: 1, marginTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight }}>
+        <WebView
+          source={{ uri: checkoutUrl }}
+          onNavigationStateChange={handleNavigationStateChange}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-        <View style={{flexDirection: 'row', justifyContent: 'center', padding: 16, backgroundColor: '#00843D', alignItems: 'center', marginBottom: 16}}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{position: 'absolute', left: 16}}>
-                <Icon name="arrow-left" size={24} color="#fff"  />
-            </TouchableOpacity>
-            <Text style={{color: '#fff', fontSize: 16, fontWeight: 'bold'}}>Unlock Your Business Potential</Text>
-        </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', padding: 16, backgroundColor: '#00843D', alignItems: 'center', marginBottom: 16 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', left: 16 }}>
+          <Icon name="arrow-left" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Unlock Your Business Potential</Text>
+      </View>
       <ScrollView>
         <View style={styles.card}>
           <View style={styles.headerContainer}>
             <Icon name="briefcase" size={24} color="#00843D" />
             <Text style={styles.header}>Go Premium – Grow Your Business with Smart Scanning</Text>
           </View>
-          
+
           <View style={styles.benefitsContainer}>
             <View style={styles.benefitRow}>
               <Icon name="lock-open" size={18} color="#00843D" style={styles.benefitIcon} />
@@ -90,7 +179,7 @@ const OrthoticSale = () => {
               <Text style={styles.benefitText}>Fast Order Fulfilment, Seamless Commission</Text>
             </View>
           </View>
-          
+
           <View style={styles.plansContainer}>
             {plans.map((plan) => (
               <TouchableOpacity
@@ -105,8 +194,8 @@ const OrthoticSale = () => {
                   <View style={styles.planLeftSection}>
                     <View style={[
                       styles.radioButton,
-                      selectedPlan === plan.id ? styles.radioButtonSelected : null
-                    ]}>
+                      selectedPlan === plan.id ? styles.radioButtonSelected : null,
+                      ,]}>
                       {selectedPlan === plan.id && <View style={styles.radioButtonInner} />}
                     </View>
                     <Text style={styles.planName}>{plan.name}</Text>
@@ -122,17 +211,12 @@ const OrthoticSale = () => {
               </TouchableOpacity>
             ))}
           </View>
-          
+
           <Text style={styles.investmentNote}>💡 Get your investment back with just 2 orthotic orders/month.</Text>
-          
-          <TouchableOpacity style={styles.payButton}>
+
+          <TouchableOpacity style={styles.payButton} onPress={() => handlePayNow()}>
             <Text style={styles.buttonText}>Pay Now</Text>
-          </TouchableOpacity>
-          
-          {/* <TouchableOpacity style={styles.scanButton} onPress={() => navigation.navigate("FootScanScreen")}>
-            <Text style={styles.buttonText}>Scan Foot</Text>
-          </TouchableOpacity> */}
-          
+          </TouchableOpacity >
           <Text style={styles.disclaimerText}>Auto-renews. Cancel anytime.</Text>
         </View>
       </ScrollView>
