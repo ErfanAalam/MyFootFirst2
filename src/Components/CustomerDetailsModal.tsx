@@ -321,14 +321,14 @@ const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                             style={styles.dropdownToggle}
                             onPress={() => setIsDropdownOpen(!isDropdownOpen)}
                         >
-                            <Icon 
-                                name={isDropdownOpen ? "chevron-up" : "chevron-down"} 
-                                size={20} 
-                                color="#666" 
+                            <Icon
+                                name={isDropdownOpen ? "chevron-up" : "chevron-down"}
+                                size={20}
+                                color="#666"
                             />
                         </TouchableOpacity>
                     </View>
-                    
+
                     {isDropdownOpen && (
                         <View style={styles.dropdownContainer}>
                             <FlatList
@@ -356,7 +356,7 @@ const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                             />
                         </View>
                     )}
-                    
+
                     <TouchableOpacity
                         style={[styles.button]}
                         onPress={() => {
@@ -398,10 +398,10 @@ const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
                     <Text style={styles.genderDropdownText}>
                         Gender: {gender.charAt(0).toUpperCase() + gender.slice(1)}
                     </Text>
-                    <Icon 
-                        name={showGenderDropdown ? "chevron-up" : "chevron-down"} 
-                        size={20} 
-                        color="#666" 
+                    <Icon
+                        name={showGenderDropdown ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#666"
                     />
                 </TouchableOpacity>
                 {showGenderDropdown && (

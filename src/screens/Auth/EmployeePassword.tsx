@@ -81,6 +81,7 @@ const EmployeePassword = ({ route }: { route: any }) => {
                     await AsyncStorage.setItem('isEmployeeLoggedIn', 'true');
                     setIsLoggedIn(true);
                     await AsyncStorage.setItem('employeeData', JSON.stringify(matchedEmployee));
+                    await AsyncStorage.setItem('Retailerid', JSON.stringify(retailerId));
                     // navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
                 } else {
                     Alert.alert('Incorrect Password', 'The password you entered is incorrect.');

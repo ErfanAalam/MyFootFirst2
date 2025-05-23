@@ -1,54 +1,197 @@
-import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  Image, 
-  TouchableOpacity, 
-  SafeAreaView, 
-  Platform, 
-  StatusBar 
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  SafeAreaView,
+  Platform,
+  StatusBar,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useCart } from '../../contexts/CartContext';
+import { useUser } from '../../contexts/UserContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { WebView } from 'react-native-webview';
+import firestore from '@react-native-firebase/firestore';
 
 const CartScreen = () => {
-  const { items, updateQuantity, removeFromCart, getCartTotal } = useCart();
+  const { items, updateQuantity, removeFromCart, getCartTotal, clearCart } = useCart();
+  const { userData } = useUser();
   const navigation = useNavigation();
+  const [customerData, setCustomerData] = useState<any>(null);
+
+  // Load customer data from AsyncStorage
+  useEffect(() => {
+    const loadCustomerData = async () => {
+      try {
+        const customerStr = await AsyncStorage.getItem('customer');
+        if (customerStr) {
+          setCustomerData(JSON.parse(customerStr));
+        }
+      } catch (error) {
+        console.error('Error loading customer data:', error);
+      }
+    };
+    loadCustomerData();
+  }, []);
+
+  // State declarations
+  const [loading, setLoading] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState('');
+  const [isOrderProcessing, setIsOrderProcessing] = useState(false);
+  const orderProcessedRef = useRef(false);
+
+  const showAlert = (title: string, message: string, _type: 'success' | 'error' | 'info') => {
+    Alert.alert(title, message);
+  };
+
+  const handlePay = async () => {
+    if (!customerData) {
+      showAlert('Error', 'Please log in to continue', 'error');
+      return;
+    }
+
+    let totalPrice = 0;
+    items.forEach(item => {
+      totalPrice += item.price * item.quantity;
+    });
+
+    setLoading(true);
+    try {
+      const response = await axios.post('https://myfootfirstserver.onrender.com/create-checkout-session', {
+        name: items[0].title,
+        price: totalPrice,
+      });
+
+      orderProcessedRef.current = false;
+      setCheckoutUrl(response.request.responseURL);
+    } catch (error) {
+      console.error('Error creating Stripe session:', error);
+      showAlert('Error', 'Failed to initiate checkout', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const storeOrderData = useCallback(async () => {
+    if (!userData?.id || !customerData || isOrderProcessing) return false;
+
+    setIsOrderProcessing(true);
+    try {
+      const uniqueKey = 'QWERTYUIOPASDFGHJKLZXCVBNM1234567890';
+      const orderId = uniqueKey.split('').sort(() => Math.random() - 0.5).join('').slice(0, 8);
+
+      // Separate insole products from other products
+      const insoleProducts = items.filter(item =>
+        ['insole-active', 'insole-comfort', 'insole-sport'].includes(item.id)
+      );
+
+      // Store insole products in RetailersOrders collection
+      if (insoleProducts.length > 0) {
+        const insoleOrderData = {
+          orderId,
+          customerName: customerData.firstName || 'Anonymous',
+          customerId: customerData.id,
+          dateOfOrder: Date.now(),
+          products: insoleProducts.map(item => ({
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            priceWithSymbol: item.newPrice,
+            quantity: item.quantity,
+            image: item.image,
+            totalPrice: item.price * item.quantity,
+          })),
+          totalAmount: insoleProducts.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+          orderStatus: 'pending',
+        };
+
+        // Create the document structure: RetailersOrders/retailerid/{customerId}/orders/{orderId}
+        await firestore()
+          .collection('RetailersOrders')
+          .doc(userData.RetailerId)
+          .collection('customers')
+          .doc(customerData.id)
+          .collection('orders')
+          .doc(orderId)
+          .set(insoleOrderData);
+      }
+
+      // Clear the cart after successful order
+      clearCart();
+      return true;
+    } catch (error) {
+      console.error('Error storing order:', error);
+      return false;
+    } finally {
+      setIsOrderProcessing(false);
+    }
+  }, [userData, customerData, items, clearCart, isOrderProcessing]);
+
+  const handleNavigationStateChange = useCallback(async (navState: { url: string }) => {
+    if ((navState.url.includes('/success') || navState.url.includes('?success=true')) && !orderProcessedRef.current) {
+      orderProcessedRef.current = true;
+
+      const orderStored = await storeOrderData();
+
+      if (orderStored) {
+        setCheckoutUrl('');
+        showAlert('Success', 'Payment successful and order placed!', 'success');
+      } else {
+        showAlert('Error', 'Payment successful but failed to store order. Please contact support.', 'error');
+        setCheckoutUrl('');
+      }
+    } else if (navState.url.includes('/cancel') || navState.url.includes('?canceled=true')) {
+      showAlert('Payment Canceled', 'Your payment was canceled.', 'info');
+      setCheckoutUrl('');
+    }
+  }, [storeOrderData]);
 
   const handleIncreaseQuantity = (productId: string, currentQuantity: number) => {
-    updateQuantity(productId, currentQuantity + 1);
+    if (!customerData) {
+      showAlert('Error', 'Please log in to continue', 'error');
+      return;
+    }
+    updateQuantity(productId, currentQuantity + 1, customerData);
   };
 
   const handleDecreaseQuantity = (productId: string, currentQuantity: number) => {
+    if (!customerData) {
+      showAlert('Error', 'Please log in to continue', 'error');
+      return;
+    }
     if (currentQuantity > 1) {
-      updateQuantity(productId, currentQuantity - 1);
+      updateQuantity(productId, currentQuantity - 1, customerData);
     } else {
-      removeFromCart(productId);
+      removeFromCart(productId, customerData);
     }
   };
 
   const renderCartItem = ({ item }: { item: any }) => {
     return (
       <View style={styles.cartItemContainer}>
-        <Image 
+        <Image
           source={{ uri: item.image }}
           style={styles.productImage}
           resizeMode="cover"
         />
         <View style={styles.productDetails}>
           <Text style={styles.productTitle}>{item.title}</Text>
-          <Text style={styles.productPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
+          <Text style={styles.productPrice}>{(item.newPrice).slice(0,1)}{(item.price * item.quantity).toFixed(2)}</Text>
           <View style={styles.quantityContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quantityButton}
               onPress={() => handleDecreaseQuantity(item.id, item.quantity)}
             >
               <Text style={styles.quantityButtonText}>-</Text>
             </TouchableOpacity>
             <Text style={styles.quantityText}>{item.quantity}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.quantityButton}
               onPress={() => handleIncreaseQuantity(item.id, item.quantity)}
             >
@@ -56,9 +199,15 @@ const CartScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity 
-          style={styles.removeButton} 
-          onPress={() => removeFromCart(item.id)}
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => {
+            if (!customerData) {
+              showAlert('Error', 'Please log in to continue', 'error');
+              return;
+            }
+            removeFromCart(item.id, customerData);
+          }}
         >
           <Text style={styles.removeButtonText}>×</Text>
         </TouchableOpacity>
@@ -66,14 +215,25 @@ const CartScreen = () => {
     );
   };
 
+  if (checkoutUrl) {
+    return (
+      <SafeAreaView style={{ flex: 1, marginTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight }}>
+        <WebView
+          source={{ uri: checkoutUrl }}
+          onNavigationStateChange={handleNavigationStateChange}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Image 
+          <Image
             source={{ uri: 'https://cdn-icons-png.flaticon.com/512/130/130882.png' }}
             style={styles.backIcon}
           />
@@ -97,17 +257,23 @@ const CartScreen = () => {
               <Text style={styles.totalLabel}>Total:</Text>
               <Text style={styles.totalAmount}>${getCartTotal().toFixed(2)}</Text>
             </View>
-            <TouchableOpacity style={styles.checkoutButton}>
-              <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+            <TouchableOpacity 
+              style={styles.checkoutButton}
+              onPress={handlePay}
+              disabled={loading}
+            >
+              <Text style={styles.checkoutButtonText}>
+                {loading ? 'Processing...' : 'Proceed to Checkout'}
+              </Text>
             </TouchableOpacity>
           </View>
         </>
       ) : (
         <View style={styles.emptyCartContainer}>
           <Text style={styles.emptyCartText}>Your cart is empty</Text>
-          <TouchableOpacity 
-            style={styles.shopNowButton} 
-            onPress={() => navigation.navigate('Home' as never)}
+          <TouchableOpacity
+            style={styles.shopNowButton}
+            onPress={() => navigation.navigate('MainTabs' as never)}
           >
             <Text style={styles.shopNowButtonText}>Shop Now</Text>
           </TouchableOpacity>

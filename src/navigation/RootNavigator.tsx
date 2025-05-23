@@ -7,7 +7,7 @@ import AuthStack from './AuthStack';
 import AppTabs from './AppTabs';
 import FootScanScreen from '../screens/Home/FootScanScreen';
 import SplashScreen from '../screens/SplashScreen';
-import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
+import { getAuth } from '@react-native-firebase/auth';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import InsoleQuestions from '../screens/Home/InsoleQuestions';
 import InsoleRecommendation from '../screens/Home/InsoleRecommendation';
@@ -18,42 +18,11 @@ import { useUser } from '../contexts/UserContext';
 import OrthoticSale from '../screens/Home/OrthoticSale';
 import VolumentalScreen from '../Volumental/VolumentalScreen';
 import Messaging from '../screens/Home/Messaging';
+import GoogleRetailer from '../screens/Home/GoogleRetailer';
 const Stack = createNativeStackNavigator();
 
 const RootNavigator = () => {
-  const { isLoggedIn, loading } = useUser();
-
-  // useEffect(() => {
-  //   const auth = getAuth();
-  
-  //   const checkLoginState = async () => {
-  //     try {
-  //       const isEmployeeLoggedIn = await AsyncStorage.getItem('isEmployeeLoggedIn');
-  
-  //       if (isEmployeeLoggedIn === 'true') {
-  //         setIsLoggedIn(true);
-  //         setIsLoading(false);
-  //       } else {
-  //         // Wait for Firebase auth state
-  //         const unsubscribe = onAuthStateChanged(auth, user => {
-  //           if (user) {
-  //             setIsLoggedIn(true);
-  //           } else {
-  //             setIsLoggedIn(false);
-  //           }
-  //           setIsLoading(false);
-  //         });
-  
-  //         return unsubscribe;
-  //       }
-  //     } catch (error) {
-  //       console.error('Error checking login state:', error);
-  //       setIsLoading(false);
-  //     }
-  //   };
-  
-  //   checkLoginState();
-  // }, []);
+  const { hasProfile, isLoggedIn, loading } = useUser();
 
   if (loading) {
     return <SplashScreen />;
@@ -71,16 +40,30 @@ const RootNavigator = () => {
             },
             headerShadowVisible: false,
           }}>
-            <Stack.Screen name="MainTabs" component={AppTabs} />
-            <Stack.Screen name="FootScanScreen" component={FootScanScreen} />
-            <Stack.Screen name="InsoleQuestions" component={InsoleQuestions}/>
-            <Stack.Screen name="InsoleRecommendation" component={InsoleRecommendation}/>
-            <Stack.Screen name="ProductDetail" component={ProductDetailScreen}/>
-            <Stack.Screen name="Cart" component={CartScreen}/>
-            <Stack.Screen name="ShoesSize" component={ShoesSize}/>
-            <Stack.Screen name="OrthoticSale" component={OrthoticSale}/>
-            <Stack.Screen name="Volumental" component={VolumentalScreen}/>
-            <Stack.Screen name="Messaging" component={Messaging}/>
+            {
+              (!hasProfile) ?
+                (
+                  <>
+                    <Stack.Screen name="GoogleRetailer" component={GoogleRetailer} />
+                    {/* <Stack.Screen name="MainTabs" component={AppTabs} /> */}
+                  </>
+                )
+                :
+                (
+                  <>
+                    <Stack.Screen name="MainTabs" component={AppTabs} />
+                    <Stack.Screen name="FootScanScreen" component={FootScanScreen} />
+                    <Stack.Screen name="InsoleQuestions" component={InsoleQuestions} />
+                    <Stack.Screen name="InsoleRecommendation" component={InsoleRecommendation} />
+                    <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+                    <Stack.Screen name="Cart" component={CartScreen} />
+                    <Stack.Screen name="ShoesSize" component={ShoesSize} />
+                    <Stack.Screen name="OrthoticSale" component={OrthoticSale} />
+                    <Stack.Screen name="Volumental" component={VolumentalScreen} />
+                    <Stack.Screen name="Messaging" component={Messaging} />
+                  </>
+                )
+            }
           </Stack.Navigator>
         ) : (
           <AuthStack />

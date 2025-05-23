@@ -10,7 +10,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconButton } from 'react-native-paper';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useUser } from '../../contexts/UserContext';
 import CustomAlertModal from '../../Components/CustomAlertModal';
 import firestore from '@react-native-firebase/firestore';
 
@@ -20,14 +19,16 @@ type RootStackParamList = {
         gender: string;
         customer: any;
         RetailerId: string;
-        recommendedInsole: 'Sport' | 'Comfort' | 'Stability';
+        recommendedInsole: 'Sport' | 'Active' | 'Comfort';
     };
     InsoleRecommendation: {
-        recommendedInsole: 'Sport' | 'Comfort' | 'Stability',
+        recommendedInsole: 'Sport' | 'Active' | 'Comfort',
         shoeSize: {
             country: string;
             size: number;
-        };
+        },
+        RetailerId: string,
+        customer: any
     };
 };
 
@@ -73,8 +74,6 @@ const womenFootLengthRanges = [
 const ShoesSize = () => {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute<ShoesSizeRouteProp>();
-    const { user } = useUser();
-
     const { gender, recommendedInsole, answers, customer, RetailerId } = route.params;
 
     // State variables
@@ -107,7 +106,9 @@ const ShoesSize = () => {
 
     // Function to fetch latest measurements
     const fetchLatestMeasurements = useCallback(async () => {
-        if (!user?.uid) return;
+        if (!RetailerId || !customer?.id) {
+            return;
+        }
 
         try {
             const measurementsRef = firestore().collection('Retailers').doc(RetailerId).collection('measurements').doc(customer.id);
@@ -137,7 +138,7 @@ const ShoesSize = () => {
         } finally {
             setLoading(false);
         }
-    }, [user?.uid, gender, getRecommendedSizeIndex]);
+    }, [RetailerId, customer?.id, gender, getRecommendedSizeIndex]);
 
     useEffect(() => {
         fetchLatestMeasurements();
@@ -178,19 +179,36 @@ const ShoesSize = () => {
             const dataToSave = {
                 Questionnaire: {
                     ...answers,
-                    timestamp: firestore.FieldValue.serverTimestamp(),
+                    timestamp: Date.now(),
                 },
                 ShoeSize: {
                     country: selectedCountry,
                     size: sizeChart[selectedCountry][sizeIndex],
-                    timestamp: firestore.FieldValue.serverTimestamp(),
-                }
+                    timestamp: Date.now(),
+                },
             };
 
             // Save to Firestore
-            if (user?.uid) {
-                const userRef = firestore().collection('users').doc(user.uid);
-                await userRef.set(dataToSave, { merge: true });
+            if (customer?.id) {
+                const retailerRef = firestore().collection('Retailers').doc(RetailerId);
+                const retailerDoc = await retailerRef.get();
+                const customers = retailerDoc.data()?.customers || [];
+
+                // Find and update the specific customer in the array
+                const updatedCustomers = customers.map((c: any) => {
+                    if (c.id === customer.id) {
+                        return {
+                            ...c,
+                            insoleQuestionnaire: dataToSave,
+                        };
+                    }
+                    return c;
+                });
+
+                // Update the customers array in Firestore
+                await retailerRef.update({
+                    customers: updatedCustomers
+                });
                 console.log('Data saved to Firestore successfully');
 
                 // Navigate to recommendation screen
@@ -200,6 +218,8 @@ const ShoesSize = () => {
                         country: selectedCountry,
                         size: sizeChart[selectedCountry][sizeIndex]
                     },
+                    RetailerId: RetailerId,
+                    customer: customer,
                 });
             } else {
                 console.error('No user ID available');

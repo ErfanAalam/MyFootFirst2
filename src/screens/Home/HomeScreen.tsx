@@ -33,7 +33,7 @@ type Customer = {
 // Define the navigation types
 type RootStackParamList = {
   Home: undefined;
-  FootScanScreen: undefined;
+  FootScanScreen: { customer: Customer; retailerId: string };
   InsoleQuestions: undefined;
   OrthoticSale: { customer: Customer; retailerId: string };
   Volumental: undefined;
@@ -71,9 +71,9 @@ const HomeScreen = () => {
       } else if (userData?.RetailerId) {
         setRetailerId(userData.RetailerId.toString());
       }
-    }
+    };
 
-    findRetailerId()
+    findRetailerId();
   }, [userData])
 
   const handlePainPointSelection = (pointId: string) => {
@@ -113,7 +113,7 @@ const HomeScreen = () => {
         .get();
 
       const retailerData = retailerDoc.data();
-      return retailerData?.Paid === true;
+      return retailerData?.subscription?.paid === true;
     } catch (error) {
       console.error('Error checking retailer subscription:', error);
       return false;
@@ -127,17 +127,47 @@ const HomeScreen = () => {
       showAlert('Error', 'Retailer ID not found', 'error');
       return;
     }
+    console.log(customer)
+    await AsyncStorage.setItem('customer', JSON.stringify(customer));
 
     try {
+      // Get the current retailer document
+      const retailerRef = firestore().collection('Retailers').doc(RetailerId);
+      const retailerDoc = await retailerRef.get();
+      const retailerData = retailerDoc.data();
+
+      if (!retailerData || !retailerData.customers) {
+        showAlert('Error', 'Retailer data not found', 'error');
+        return;
+      }
+
+      // Find and update the specific customer in the customers array
+      const updatedCustomers = retailerData.customers.map((c: any) => {
+        if (c.id === customer.id) {
+          return {
+            ...c,
+            painPoints: painPoints,
+            updatedAt: Date.now(),
+          };
+        }
+        return c;
+      });
+
+      // Update the retailer document with the modified customers array
+      await retailerRef.update({
+        customers: updatedCustomers,
+      });
+
       const hasSubscription = await checkRetailerSubscription(RetailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen",{customer, RetailerId});
+        navigation.navigate("FootScanScreen", { customer, RetailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer, RetailerId });
+        navigation.navigate("OrthoticSale", { customer,  RetailerId });
       }
     } catch (error) {
-      showAlert('Error', 'Failed to check subscription status', 'error');
+      console.error('Error updating customer data:', error);
+      showAlert('Error', 'Failed to update customer data', 'error');
     }
   };
 
@@ -147,16 +177,44 @@ const HomeScreen = () => {
       return;
     }
 
+    await AsyncStorage.setItem('customer', JSON.stringify(customer));
+
     try {
+      // Get the current retailer document
+      const retailerRef = firestore().collection('Retailers').doc(RetailerId);
+      const retailerDoc = await retailerRef.get();
+      const retailerData = retailerDoc.data();
+
+      if (!retailerData) {
+        showAlert('Error', 'Retailer data not found', 'error');
+        return;
+      }
+
+      // Create new customer object with pain points
+      const newCustomer = {
+        ...customer,
+        painPoints: painPoints,
+        updatedAt: Date.now()
+      };
+
+      // Add the new customer to the customers array
+      const updatedCustomers = [...(retailerData.customers || []), newCustomer];
+
+      // Update the retailer document with the modified customers array
+      await retailerRef.update({
+        customers: updatedCustomers,
+      });
+
       const hasSubscription = await checkRetailerSubscription(RetailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen",{customer,RetailerId});
+        navigation.navigate("FootScanScreen", { customer, RetailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer, retailerId: RetailerId });
+        navigation.navigate("OrthoticSale", { customer, RetailerId });
       }
     } catch (error) {
-      showAlert('Error', 'Failed to check subscription status', 'error');
+      console.error('Error adding new customer:', error);
+      showAlert('Error', 'Failed to add new customer', 'error');
     }
   };
 

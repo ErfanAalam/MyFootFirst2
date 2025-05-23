@@ -532,9 +532,9 @@ const FootScanScreen = () => {
                     ]}
                 />
                 <View style={styles.footGuideHeader}>
-                    <Text style={styles.footGuideTitle}>{currentFoot === 'left' ? 'Left' : 'Right'} foot</Text>
+                    <Text style={styles.footGuideTitle}>{currentFoot === 'left' ? 'Left' : 'Right'} Foot</Text>
                     <Text style={styles.footGuideSubtitle}>
-                        {currentView === 'left' ? 'Outside' : currentView === 'right' ? 'Inside' : 'Top'} view
+                        {currentView === 'left' ? 'Outside' : currentView === 'right' ? 'Inside' : 'Top'} View
                     </Text>
                 </View>
 
@@ -774,7 +774,8 @@ const FootScanScreen = () => {
             {renderCamera()}
             <TouchableOpacity
                 style={styles.nextButton}
-                onPress={() => navigation.goBack()}
+                // onPress={() => navigation.goBack()}
+                onPress={() => {navigation.navigate('InsoleQuestions',{customer: customer,RetailerId: RetailerId});}}
             >
                 <Text style={styles.nextText}>Cancel</Text>
             </TouchableOpacity>

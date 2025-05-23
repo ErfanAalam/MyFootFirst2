@@ -84,14 +84,6 @@ const SignupScreen = () => {
 
       // If email doesn't exist, proceed to signup details
       showAlert('Success', 'Successfully signed in with Google', 'success');
-      if (userCredential.user.email) {
-        navigation.navigate('SignupDetails', {
-          email: userCredential.user.email,
-          isGoogleSignIn: true,
-        });
-      } else {
-        throw new Error('No email found in Google account');
-      }
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
 

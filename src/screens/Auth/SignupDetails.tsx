@@ -62,7 +62,7 @@ const SignupDetails = () => {
   const validateForm = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!businessName || !businessType || !contactFirstName || !contactLastName || !contactRole || !email || !address || !city || !state || !postalCode || !country || !countryCode || !callingCode || !phone ) {
+    if (!businessName || !businessType || !contactFirstName || !contactLastName || !contactRole || !email || !address || !city || !state || !postalCode || !country || !countryCode || !callingCode || !phone) {
       showAlert("Validation Error", "All required fields must be filled.", 'error');
       return false;
     }
@@ -82,7 +82,7 @@ const SignupDetails = () => {
     if (!validateForm()) return;
 
     try {
-      navigation.navigate('SignUpPassword',{
+      navigation.navigate('SignUpPassword', {
         businessName,
         businessType,
         contactFirstName,
@@ -122,7 +122,7 @@ const SignupDetails = () => {
             <Text style={styles.privacyTitle}>Privacy Policy</Text>
             <Text style={styles.privacySubtitle}>MyFootFirst</Text>
             <Text style={styles.privacyEffectiveDate}>Effective Date: 10 May 2025</Text>
-            
+
             <Text style={styles.privacyIntro}>
               This Privacy Policy explains how MyFootFirst collects, uses, stores, and shares personal data when you use our mobile applications and services, whether as a business partner (B2B) or an individual customer (B2C), in accordance with the General Data Protection Regulation (GDPR) and other applicable laws.
             </Text>

@@ -102,7 +102,6 @@ const LoginScreen = () => {
       }
 
       showAlert('Success', 'Successfully signed in with Google', 'success');
-      navigation.navigate('MainTabs');
     } catch (error: any) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         showAlert('Error', 'Sign in was cancelled', 'error');
@@ -147,7 +146,6 @@ const LoginScreen = () => {
       }
 
       showAlert('Success', 'Successfully signed in with Apple', 'success');
-      navigation.navigate('MainTabs');
     } catch (error: any) {
       if (error.code === appleAuth.Error.CANCELED) {
         showAlert('Error', 'Sign in was cancelled', 'error');

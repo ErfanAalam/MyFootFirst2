@@ -9,6 +9,7 @@ import {
   StatusBar,
   Platform,
   Alert,
+  TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome5'; // Make sure to install: npm install react-native-vector-icons
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -46,16 +47,19 @@ type Plan = {
 const OrthoticSale = () => {
   const navigation = useNavigation();
   const route = useRoute<OrthoticSaleRouteProp>();
-  const {customer, RetailerId } = route.params;
+  const { customer, RetailerId } = route.params;
   const [selectedPlan, setSelectedPlan] = useState('6-month');
   const [checkoutUrl, setCheckoutUrl] = useState('');
   const [_loading, setLoading] = useState(false);
-
+  const [couponCode, setCouponCode] = useState('');
+  const [_discountedPrice, setDiscountedPrice] = useState<number | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const plans = [
     {
       id: '1-month',
       name: '1 Month',
-      price: '€50',
+      price: '€49',
       discount: null,
       popular: false,
       bestValue: false,
@@ -66,7 +70,7 @@ const OrthoticSale = () => {
       price: '€255',
       discount: '15% off',
       popular: true,
-      bestValue: false
+      bestValue: false,
     },
     {
       id: '12-month',
@@ -74,8 +78,8 @@ const OrthoticSale = () => {
       price: '€420',
       discount: '30% off',
       popular: false,
-      bestValue: true
-    }
+      bestValue: true,
+    },
   ];
 
   const renderPlanBadge = (plan: Plan) => {
@@ -96,15 +100,72 @@ const OrthoticSale = () => {
     return null;
   };
 
+  const validateAndApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+
+    setLoading(true);
+    setCouponError('');
+    try {
+      const currentDate = new Date().toISOString().split('T')[0];
+      const userPlan = plans.find(plan => plan.id === selectedPlan);
+
+      // Simplified query with just codeName and isActive
+      const couponsSnapshot = await firestore()
+        .collection('coupons')
+        .where('codeName', '==', couponCode.trim())
+        .where('isActive', '==', true)
+        .get();
+
+      if (couponsSnapshot.empty) {
+        setCouponError('Invalid or expired coupon code');
+        setDiscountedPrice(null);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      // Filter valid coupons in memory
+      const validCoupon = couponsSnapshot.docs.find(doc => {
+        const coupon = doc.data();
+        const isValidDate =
+          coupon.validFrom <= currentDate &&
+          coupon.validThrough >= currentDate;
+        const isValidPlan =
+          coupon.membershipPlan.toLowerCase() === userPlan?.name.toLowerCase();
+
+        return isValidDate && isValidPlan;
+      });
+
+      if (!validCoupon) {
+        setCouponError('Coupon not valid for selected plan or has expired');
+        setDiscountedPrice(null);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      const couponData = validCoupon.data();
+      setDiscountedPrice(couponData.discountedPrice);
+      setAppliedCoupon(couponData);
+      setCouponError('');
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      setCouponError('Error validating coupon');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePayNow = async () => {
     const userPlan = plans.filter((plan) => plan.id.includes(selectedPlan));
-    // console.log(userPlan[0]);
-    const Price = userPlan[0].price.replace('€', '');
+    const Price = appliedCoupon ? appliedCoupon.discountedPrice.toString() : userPlan[0].price.replace('€', '');
     setLoading(true);
     try {
       const response = await axios.post('https://myfootfirstserver.onrender.com/create-checkout-session', {
         name: userPlan[0].name,
         price: Price,
+        couponCode: appliedCoupon ? couponCode : undefined,
       });
 
       setCheckoutUrl(response.request.responseURL);
@@ -117,7 +178,7 @@ const OrthoticSale = () => {
   };
 
   const handleNavigationStateChange = useCallback(async (navState: { url: string }) => {
-    console.log(RetailerId);
+    const userPlan = plans.filter((plan) => plan.id.includes(selectedPlan));
     if ((navState.url.includes('/success') || navState.url.includes('?success=true'))) {
       try {
         // return;
@@ -125,10 +186,16 @@ const OrthoticSale = () => {
         await firestore()
           .collection('Retailers')
           .doc(RetailerId)
-          .set({ Paid: true }, { merge: true });
+          .set({
+            subscription: {
+              plan: userPlan[0].name,
+              paid: true,
+              timestamp: firestore.FieldValue.serverTimestamp(),
+            },
+          }, { merge: true });
 
 
-        navigation.navigate('FootScanScreen',{customer, RetailerId});
+        navigation.navigate('FootScanScreen', { customer, RetailerId });
       } catch (error) {
         console.error('Error saving order:', error);
         Alert.alert('Error', 'Failed to save order details', [{ text: 'OK' }]);
@@ -214,10 +281,61 @@ const OrthoticSale = () => {
 
           <Text style={styles.investmentNote}>💡 Get your investment back with just 2 orthotic orders/month.</Text>
 
-          <TouchableOpacity style={styles.payButton} onPress={() => handlePayNow()}>
-            <Text style={styles.buttonText}>Pay Now</Text>
-          </TouchableOpacity >
-          <Text style={styles.disclaimerText}>Auto-renews. Cancel anytime.</Text>
+          <View style={styles.couponContainer}>
+            <View style={styles.couponInputContainer}>
+              <TextInput
+                style={styles.couponInput}
+                placeholder="Enter coupon code"
+                value={couponCode}
+                onChangeText={setCouponCode}
+                editable={!appliedCoupon}
+                placeholderTextColor="#000000"
+              />
+              <TouchableOpacity
+                style={[styles.applyButton, appliedCoupon && styles.applyButtonDisabled]}
+                onPress={validateAndApplyCoupon}
+                disabled={!!appliedCoupon}
+              >
+                <Text style={styles.applyButtonText}>{appliedCoupon ? 'Applied' : 'Apply'}</Text>
+              </TouchableOpacity>
+            </View>
+            {couponError ? (
+              <Text style={styles.couponError}>{couponError}</Text>
+            ) : appliedCoupon ? (
+              <View style={styles.discountContainer}>
+                <Text style={styles.appliedDiscountText}>
+                  Discount applied for this month! 
+                </Text>
+                <Text>
+                New price: €{appliedCoupon.discountedPrice}
+                </Text>
+                <Text>
+                  Subscription plan will renew for standard price unless cancelled.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCouponCode('');
+                    setDiscountedPrice(null);
+                    setAppliedCoupon(null);
+                    setCouponError('');
+                  }}
+                >
+                  <Text style={styles.removeCouponText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.payButton, _loading && styles.payButtonDisabled]}
+            onPress={handlePayNow}
+            disabled={_loading}
+          >
+            <Text style={styles.buttonText}>
+              {_loading ? 'Processing...' : 'Pay Now'}
+            </Text>
+          </TouchableOpacity>
+          {/* <Text style={styles.disclaimerText}>Auto-renews. Cancel anytime.</Text> */}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -358,6 +476,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 16,
   },
+  couponContainer: {
+    marginBottom: 16,
+  },
+  couponInputContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  couponInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    fontSize: 14,
+  },
+  applyButton: {
+    backgroundColor: '#00843D',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  applyButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  applyButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  couponError: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  discountContainer: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    padding: 8,
+    borderRadius: 8,
+  },
+  appliedDiscountText: {
+    color: '#059669',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  removeCouponText: {
+    color: '#00843D',
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
   payButton: {
     backgroundColor: '#00843D',
     borderRadius: 8,
@@ -365,12 +539,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  scanButton: {
-    backgroundColor: '#00843D',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 12,
+  payButtonDisabled: {
+    backgroundColor: '#9CA3AF',
   },
   buttonText: {
     color: '#FFFFFF',
