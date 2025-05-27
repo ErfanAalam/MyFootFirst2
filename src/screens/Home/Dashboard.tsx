@@ -469,12 +469,13 @@ const Dashboard = () => {
                 // Calculate total cost (base price + shipping) * quantity
                 const totalCost = (basePrice + shippingCost) * product.quantity;
 
-                // Get selling price from retailer markup and calculate total markup
+                // Get selling price from retailer markup
                 const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
-                const totalMarkup = markupValue * product.quantity;
+                // Calculate total revenue (markup * quantity)
+                const totalRevenue = markupValue * product.quantity;
 
-                // Calculate profit as total markup - total cost
-                const profit = totalMarkup - totalCost;
+                // Calculate profit as total revenue - total cost
+                const profit = totalRevenue - totalCost;
 
                 console.log(`\nProduct Details:
                     Original Title: ${product.title}
@@ -484,7 +485,7 @@ const Dashboard = () => {
                     Quantity: ${product.quantity}
                     Total Cost: ${totalCost}
                     Markup Value: ${markupValue}
-                    Total Markup: ${totalMarkup}
+                    Total Revenue: ${totalRevenue}
                     Profit: ${profit}
                 `);
 
@@ -561,24 +562,16 @@ const Dashboard = () => {
                 return orderDate >= datePoint && orderDate < nextDate;
             });
 
-            // Calculate profit for this period
+            // Calculate profit for this period using the same logic as total profit
             const periodProfit = periodOrders.reduce((sum, order) => {
                 const orderProfit = order.products.reduce((productSum, product) => {
-                    // Normalize product title
-                    const normalizedTitle = product.title.toLowerCase().replace(' insole', '');
-
-                    // Get base price and shipping
+                    const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
                     const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
                     const shippingCost = Number(pricing?.Shipping) || 0;
-
-                    // Calculate total cost and markup
                     const totalCost = (basePrice + shippingCost) * product.quantity;
                     const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
-                    const totalMarkup = markupValue * product.quantity;
-
-                    // Calculate profit
-                    const profit = totalMarkup - totalCost;
-
+                    const totalRevenue = markupValue * product.quantity;
+                    const profit = totalRevenue - totalCost;
                     return productSum + profit;
                 }, 0);
                 return sum + orderProfit;
@@ -592,11 +585,11 @@ const Dashboard = () => {
         return {
             totalOrders,
             totalProfit,
-            chartData
+            chartData,
         };
     };
 
-    const screenWidth = Dimensions.get('window').width - 40;
+    const screenWidth = Dimensions.get('window').width - 60;
 
     // Update chart dot content with correct type
     const renderDotContent = ({ x, y, index: _index, indexData }: { x: number; y: number; index: number; indexData: number }) => (
@@ -769,7 +762,7 @@ const Dashboard = () => {
                             <LineChart
                                 data={{
                                     labels: metrics.chartData.labels,
-                                    datasets: [{ data: metrics.chartData.profit }]
+                                    datasets: [{ data: metrics.chartData.profit }],
                                 }}
                                 width={screenWidth}
                                 height={220}
@@ -830,21 +823,27 @@ const Dashboard = () => {
                         <Text style={styles.sectionTitle}>Recent Orders</Text>
 
                         {/* Table Header */}
-                        <View style={styles.tableRow}>
-                            <Text style={styles.headerCell}>Customer</Text>
-                            <Text style={styles.headerCell}>Product</Text>
-                            <Text style={styles.headerCell}>Date</Text>
-                            <Text style={styles.headerCell}>Status</Text>
+                        <View style={styles.orderTableHeader}>
+                            <Text style={styles.orderHeaderCell}>Customer</Text>
+                            <Text style={styles.orderHeaderCell}>Products</Text>
+                            <Text style={styles.orderHeaderCell}>Date</Text>
+                            <Text style={styles.orderHeaderCell}>Status</Text>
                         </View>
 
                         {/* Order Rows */}
                         {orders.slice(0, 5).map((order, index) => (
-                            <View key={index} style={styles.tableRow}>
-                                <Text style={styles.tableCell}>{order.customerName}</Text>
-                                <Text style={styles.tableCell}>
-                                    {order.products.map(p => p.title).join(', ')}
+                            <View key={index} style={styles.orderTableRow}>
+                                <Text style={styles.orderTableCell} numberOfLines={1} ellipsizeMode="tail">
+                                    {order.customerName}
                                 </Text>
-                                <Text style={styles.tableCell}>
+                                <View style={styles.orderProductsCell}>
+                                    {order.products.map((product, pIndex) => (
+                                        <Text key={pIndex} style={styles.productText} numberOfLines={1} ellipsizeMode="tail">
+                                            {(product.title)}(x{product.quantity})
+                                        </Text>
+                                    ))}
+                                </View>
+                                <Text style={styles.orderTableCell}>
                                     {new Date(order.dateOfOrder).toLocaleDateString()}
                                 </Text>
                                 {renderStatus(order.orderStatus)}
@@ -1114,6 +1113,7 @@ const styles = StyleSheet.create({
     },
     chartContainer: {
         alignItems: 'center',
+        overflow:'hidden',
         marginTop: 10,
         backgroundColor: '#fff',
         borderRadius: 10,
@@ -1127,6 +1127,7 @@ const styles = StyleSheet.create({
     chart: {
         marginVertical: 8,
         borderRadius: 16,
+        marginLeft:-30,
     },
     tableRow: {
         flexDirection: 'row',
@@ -1390,6 +1391,44 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 10,
         fontWeight: 'bold',
+    },
+    orderTableHeader: {
+        flexDirection: 'row',
+        borderBottomWidth: 2,
+        borderBottomColor: '#ddd',
+        paddingVertical: 12,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 5,
+        marginBottom: 5,
+    },
+    orderHeaderCell: {
+        flex: 1,
+        fontWeight: 'bold',
+        fontSize: 13,
+        color: '#333',
+        paddingHorizontal: 10,
+    },
+    orderTableRow: {
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        paddingVertical: 12,
+        alignItems: 'flex-start',
+    },
+    orderTableCell: {
+        flex: 1,
+        fontSize: 12,
+        color: '#333',
+        paddingHorizontal: 4,
+    },
+    orderProductsCell: {
+        flex: 2,
+        paddingHorizontal: 4,
+    },
+    productText: {
+        fontSize: 12,
+        color: '#333',
+        marginBottom: 4,
     },
 });
 
