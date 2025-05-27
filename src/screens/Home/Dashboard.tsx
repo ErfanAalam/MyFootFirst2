@@ -448,46 +448,27 @@ const Dashboard = () => {
             return orderDate >= startDate && orderDate <= endDate;
         });
 
-        console.log('Filtered Orders:', JSON.stringify(filteredOrders, null, 2));
-        console.log('Pricing Data:', JSON.stringify(pricing, null, 2));
-        console.log('Retailer Markup:', JSON.stringify(markup, null, 2));
-
         const totalOrders = filteredOrders.length;
 
         // Calculate total profit for each order
         const totalProfit = filteredOrders.reduce((sum, order) => {
-            console.log('\nProcessing Order:', order.orderId);
-            console.log('Customer:', order.customerName);
-
             const orderProfit = order.products.reduce((productSum, product) => {
                 // Normalize product title by making lowercase and removing "insole" word
                 const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
                 // Get base price and shipping from pricing data
-                const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
-                const shippingCost = Number(pricing?.Shipping) || 0;
+                // const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
+                // const shippingCost = Number(pricing?.Shipping) || 0;
 
                 // Calculate total cost (base price + shipping) * quantity
-                const totalCost = (basePrice + shippingCost) * product.quantity;
-
+                // const totalCost = (basePrice + shippingCost) * product.quantity;
+                // setTotalCost(totalCost)
                 // Get selling price from retailer markup
                 const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
                 // Calculate total revenue (markup * quantity)
                 const totalRevenue = markupValue * product.quantity;
 
                 // Calculate profit as total revenue - total cost
-                const profit = totalRevenue - totalCost;
-
-                console.log(`\nProduct Details:
-                    Original Title: ${product.title}
-                    Normalized Title: ${normalizedTitle}
-                    Base Price: ${basePrice}
-                    Shipping Cost: ${shippingCost}
-                    Quantity: ${product.quantity}
-                    Total Cost: ${totalCost}
-                    Markup Value: ${markupValue}
-                    Total Revenue: ${totalRevenue}
-                    Profit: ${profit}
-                `);
+                const profit = totalRevenue;
 
                 return productSum + profit;
             }, 0);
@@ -571,7 +552,7 @@ const Dashboard = () => {
                     const totalCost = (basePrice + shippingCost) * product.quantity;
                     const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
                     const totalRevenue = markupValue * product.quantity;
-                    const profit = totalRevenue - totalCost;
+                    const profit = totalRevenue;
                     return productSum + profit;
                 }, 0);
                 return sum + orderProfit;
@@ -1183,7 +1164,7 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     addButton: {
-        backgroundColor: '#007AFF',
+        backgroundColor: '#00843D',
         borderRadius: 5,
         paddingVertical: 12,
         alignItems: 'center',
@@ -1364,8 +1345,8 @@ const styles = StyleSheet.create({
         borderColor: '#ddd',
     },
     selectedRole: {
-        backgroundColor: '#e3f2fd',
-        borderColor: '#2196F3',
+        backgroundColor: '00732E',
+        borderColor: '#00843D',
     },
     roleOptionText: {
         color: '#333',
