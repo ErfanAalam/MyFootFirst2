@@ -12,7 +12,7 @@ import {
     Modal,
     ActivityIndicator
 } from 'react-native';
-import { LineChart, BarChart } from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import firestore from '@react-native-firebase/firestore';
 import { useUser } from '../../contexts/UserContext';
@@ -58,6 +58,70 @@ interface ExtendedUserData {
     country: string;
     employees?: Employee[];
 }
+
+// Add new interface for date picker modal
+interface DatePickerModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onSelect: (date: Date) => void;
+    currentDate: Date;
+    isStartDate: boolean;
+    otherDate: Date;
+    showAlert: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
+}
+
+// Update DatePickerModal component
+const DatePickerModal = ({ 
+    visible, 
+    onClose, 
+    onSelect, 
+    currentDate, 
+    isStartDate, 
+    otherDate,
+    showAlert 
+}: DatePickerModalProps) => {
+    const handleDateSelect = (selectedDate: Date) => {
+        if (isStartDate) {
+            // For start date, check if it's more than 12 months before end date
+            const maxStartDate = new Date(otherDate);
+            maxStartDate.setMonth(maxStartDate.getMonth() - 12);
+            
+            if (selectedDate < maxStartDate) {
+                showAlert('Invalid Date', 'Start date cannot be more than 12 months before end date', 'error');
+                return;
+            }
+        } else {
+            // For end date, check if it's more than 12 months after start date
+            const maxEndDate = new Date(otherDate);
+            maxEndDate.setMonth(maxEndDate.getMonth() + 12);
+            
+            if (selectedDate > maxEndDate) {
+                showAlert('Invalid Date', 'End date cannot be more than 12 months after start date', 'error');
+                return;
+            }
+        }
+        onSelect(selectedDate);
+        onClose();
+    };
+
+    if (!visible) return null;
+
+    return (
+        <DateTimePicker
+            value={currentDate}
+            mode="date"
+            display="spinner"
+            onChange={(event, selectedDate) => {
+                if (event.type === 'set' && selectedDate) {
+                    handleDateSelect(selectedDate);
+                } else {
+                    onClose();
+                }
+            }}
+            style={styles.datePicker}
+        />
+    );
+};
 
 const Dashboard = () => {
     const { userData } = useUser() as { userData: ExtendedUserData | null };
@@ -384,56 +448,77 @@ const Dashboard = () => {
             return orderDate >= startDate && orderDate <= endDate;
         });
 
-        console.log('Filtered orders:', filteredOrders); // Debug log
-
         const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
         const totalOrders = filteredOrders.length;
 
-        // Prepare chart data
+        // Calculate date range in days
         const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Determine the interval based on date range
+        let interval: 'day' | 'week' | 'month';
+        let dateFormat: Intl.DateTimeFormatOptions;
+        
+        if (daysDiff <= 7) {
+            interval = 'day';
+            dateFormat = { weekday: 'short' };
+        } else if (daysDiff <= 31) {
+            interval = 'week';
+            dateFormat = { month: 'short', day: 'numeric' };
+        } else {
+            interval = 'month';
+            dateFormat = { month: 'short', year: 'numeric' };
+        }
+
         const chartData = {
             labels: [] as string[],
             orders: [] as number[],
             revenue: [] as number[]
         };
 
-        if (daysDiff <= 31) {
-            // Show daily data
-            for (let i = 0; i <= daysDiff; i++) {
-                const date = new Date(startDate);
-                date.setDate(date.getDate() + i);
-                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        // Create date points based on interval
+        const datePoints: Date[] = [];
+        const currentDate = new Date(startDate);
 
-                const dayOrders = filteredOrders.filter(order => {
-                    const orderDate = new Date(order.dateOfOrder);
-                    return orderDate.toDateString() === date.toDateString();
-                });
-
-                chartData.labels.push(dateStr);
-                chartData.orders.push(dayOrders.length);
-                chartData.revenue.push(dayOrders.reduce((sum, order) => sum + order.totalAmount, 0));
+        while (currentDate <= endDate) {
+            datePoints.push(new Date(currentDate));
+            
+            switch (interval) {
+                case 'day':
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    break;
+                case 'week':
+                    currentDate.setDate(currentDate.getDate() + 7);
+                    break;
+                case 'month':
+                    currentDate.setMonth(currentDate.getMonth() + 1);
+                    break;
             }
-        } else {
-            // Show monthly data
-            const months: { [key: string]: { orders: number; revenue: number } } = {};
-
-            filteredOrders.forEach(order => {
-                const date = new Date(order.dateOfOrder);
-                const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-                if (!months[monthKey]) {
-                    months[monthKey] = { orders: 0, revenue: 0 };
-                }
-                months[monthKey].orders += 1;
-                months[monthKey].revenue += order.totalAmount;
-            });
-
-            Object.entries(months).forEach(([month, data]) => {
-                chartData.labels.push(month);
-                chartData.orders.push(data.orders);
-                chartData.revenue.push(data.revenue);
-            });
         }
+
+        // Aggregate data for each date point
+        datePoints.forEach(datePoint => {
+            const nextDate = new Date(datePoint);
+            switch (interval) {
+                case 'day':
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    break;
+                case 'week':
+                    nextDate.setDate(nextDate.getDate() + 7);
+                    break;
+                case 'month':
+                    nextDate.setMonth(nextDate.getMonth() + 1);
+                    break;
+            }
+
+            const periodOrders = filteredOrders.filter(order => {
+                const orderDate = new Date(order.dateOfOrder);
+                return orderDate >= datePoint && orderDate < nextDate;
+            });
+
+            chartData.labels.push(datePoint.toLocaleDateString('en-US', dateFormat));
+            chartData.orders.push(periodOrders.length);
+            chartData.revenue.push(periodOrders.reduce((sum, order) => sum + order.totalAmount, 0));
+        });
 
         return {
             totalOrders,
@@ -442,53 +527,21 @@ const Dashboard = () => {
         };
     };
 
-    const metrics = calculateMetrics();
     const screenWidth = Dimensions.get('window').width - 40;
 
-    const chartConfig = {
-        backgroundGradientFrom: '#ffffff',
-        backgroundGradientTo: '#ffffff',
-        color: (opacity = 1) => `rgba(0, 132, 61, ${opacity})`,
-        strokeWidth: 2,
-        barPercentage: 0.5,
-        useShadowColorFromDataset: false,
-        yAxisLabel: '',
-        yAxisSuffix: '',
-        formatYLabel: (value: string) => {
-            const num = parseFloat(value);
-            return num >= 1000 ? `${(num / 1000).toFixed(1)}k` : num.toString();
-        },
-        propsForLabels: {
-            fontSize: 10,
-            rotation: 45,
-            translateX: 10,
-            translateY: 0,
-        },
-        count: Math.min(metrics.chartData.labels.length, Math.floor(screenWidth / 60)),
-        paddingRight: 20,
-        paddingTop: 20,
-        decimalPlaces: 0,
-    };
+    // Update chart dot content with correct type
+    const renderDotContent = ({ x, y, index: _index, indexData }: { x: number; y: number; index: number; indexData: number }) => (
+        <View style={[styles.dotLabel, { left: x - 10, top: y - 20 }]}>
+            <Text style={styles.dotLabelText}>
+                {indexData >= 1000 ? `${(indexData / 1000).toFixed(1)}k` : indexData}
+            </Text>
+        </View>
+    );
 
-    const chartHeight = Math.max(220, screenWidth * 0.6);
+    // Remove unused variables
+    const metrics = calculateMetrics();
 
-    const formatChartLabels = (labels: string[]) => {
-        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (daysDiff <= 31) {
-            const skipFactor = Math.max(1, Math.ceil(labels.length / (screenWidth / 60)));
-            return labels.map((label, index) =>
-                index % skipFactor === 0 ? label : ''
-            );
-        } else {
-            return labels.map(label => {
-                const [month, year] = label.split(' ');
-                return `${month}\n'${year.slice(2)}`;
-            });
-        }
-    };
-
-    // Render status with appropriate color
+    // Add back renderStatus function
     const renderStatus = (status: string) => {
         let color;
         switch (status) {
@@ -508,6 +561,42 @@ const Dashboard = () => {
         return (
             <Text style={[styles.tableCell, { color }]}>{status}</Text>
         );
+    };
+
+    // Remove unused chartHeight and formatChartLabels variables
+    const chartConfig = {
+        backgroundGradientFrom: '#ffffff',
+        backgroundGradientTo: '#ffffff',
+        color: (opacity = 1) => `rgba(0, 132, 61, ${opacity})`,
+        strokeWidth: 2,
+        barPercentage: 0.5,
+        useShadowColorFromDataset: false,
+        yAxisLabel: '',
+        yAxisSuffix: '',
+        formatYLabel: (value: string) => {
+            const num = parseFloat(value);
+            return num >= 1000 ? `${(num / 1000).toFixed(1)}k` : num.toString();
+        },
+        propsForLabels: {
+            fontSize: 12,
+            rotation: 0,
+            translateX: 0,
+            translateY: 0,
+        },
+        propsForDots: {
+            r: '4',
+            strokeWidth: '2',
+            stroke: '#00843D'
+        },
+        propsForBackgroundLines: {
+            strokeDasharray: '', // Solid lines
+            stroke: '#E0E0E0',
+            strokeWidth: 1,
+        },
+        decimalPlaces: 0,
+        count: 5, // Number of segments on Y axis
+        paddingRight: 20,
+        paddingTop: 20,
     };
 
     return (
@@ -544,27 +633,27 @@ const Dashboard = () => {
                             </TouchableOpacity>
                         </View>
 
-                        {(showStartDatePicker || showEndDatePicker) && (
-                            <DateTimePicker
-                                value={showStartDatePicker ? startDate : endDate}
-                                mode="date"
-                                display="default"
-                                onChange={(event, selectedDate) => {
-                                    if (event.type === 'set' && selectedDate) {
-                                        if (showStartDatePicker) {
-                                            setStartDate(selectedDate);
-                                            setShowStartDatePicker(false);
-                                        } else {
-                                            setEndDate(selectedDate);
-                                            setShowEndDatePicker(false);
-                                        }
-                                    } else {
-                                        setShowStartDatePicker(false);
-                                        setShowEndDatePicker(false);
-                                    }
-                                }}
+                        <View style={styles.datePickerWrapper}>
+                            <DatePickerModal
+                                visible={showStartDatePicker}
+                                onClose={() => setShowStartDatePicker(false)}
+                                onSelect={(date) => setStartDate(date)}
+                                currentDate={startDate}
+                                isStartDate={true}
+                                otherDate={endDate}
+                                showAlert={showAlert}
                             />
-                        )}
+
+                            <DatePickerModal
+                                visible={showEndDatePicker}
+                                onClose={() => setShowEndDatePicker(false)}
+                                onSelect={(date) => setEndDate(date)}
+                                currentDate={endDate}
+                                isStartDate={false}
+                                otherDate={startDate}
+                                showAlert={showAlert}
+                            />
+                        </View>
                     </View>
 
                     {/* Metrics Section */}
@@ -585,43 +674,14 @@ const Dashboard = () => {
                     {/* Charts Section */}
                     <View style={styles.sectionContainer}>
                         <Text style={styles.sectionTitle}>Orders Over Time</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.chartScrollContainer}
-                        >
-                            <BarChart
-                                data={{
-                                    labels: formatChartLabels(metrics.chartData.labels),
-                                    datasets: [{ data: metrics.chartData.orders }]
-                                }}
-                                width={Math.max(screenWidth, metrics.chartData.labels.length * 60)}
-                                height={chartHeight}
-                                chartConfig={chartConfig}
-                                style={styles.chart}
-                                showValuesOnTopOfBars
-                                yAxisLabel=""
-                                yAxisSuffix=""
-                                fromZero
-                                segments={4}
-                            />
-                        </ScrollView>
-                    </View>
-
-                    <View style={styles.sectionContainer}>
-                        <Text style={styles.sectionTitle}>Profit Over Time</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.chartScrollContainer}
-                        >
+                        <View style={styles.chartContainer}>
                             <LineChart
                                 data={{
-                                    labels: formatChartLabels(metrics.chartData.labels),
-                                    datasets: [{ data: metrics.chartData.revenue }]
+                                    labels: metrics.chartData.labels,
+                                    datasets: [{ data: metrics.chartData.orders }]
                                 }}
-                                width={Math.max(screenWidth, metrics.chartData.labels.length * 60)}
-                                height={chartHeight}
+                                width={screenWidth}
+                                height={220}
                                 chartConfig={chartConfig}
                                 style={styles.chart}
                                 bezier
@@ -629,8 +689,31 @@ const Dashboard = () => {
                                 yAxisSuffix=""
                                 fromZero
                                 segments={4}
+                                renderDotContent={renderDotContent}
                             />
-                        </ScrollView>
+                        </View>
+                    </View>
+
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Revenue Over Time</Text>
+                        <View style={styles.chartContainer}>
+                            <LineChart
+                                data={{
+                                    labels: metrics.chartData.labels,
+                                    datasets: [{ data: metrics.chartData.revenue }]
+                                }}
+                                width={screenWidth}
+                                height={220}
+                                chartConfig={chartConfig}
+                                style={styles.chart}
+                                bezier
+                                yAxisLabel=""
+                                yAxisSuffix=""
+                                fromZero
+                                segments={4}
+                                renderDotContent={renderDotContent}
+                            />
+                        </View>
                     </View>
 
                     {/* Products and Markup Section */}
@@ -963,6 +1046,14 @@ const styles = StyleSheet.create({
     chartContainer: {
         alignItems: 'center',
         marginTop: 10,
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     chart: {
         marginVertical: 8,
@@ -1055,7 +1146,7 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1210,6 +1301,26 @@ const styles = StyleSheet.create({
         color: '#333',
         fontSize: 16,
         textAlign: 'center',
+    },
+    datePickerWrapper: {
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    datePicker: {
+        height: 200,
+        width: '100%',
+    },
+    dotLabel: {
+        position: 'absolute',
+        backgroundColor: 'rgba(0, 132, 61, 0.9)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    dotLabelText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
     },
 });
 

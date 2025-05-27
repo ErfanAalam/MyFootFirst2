@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Platform, StatusBar } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import { useCart } from '../../contexts/CartContext';
+import { useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface LocationData {
     latitude: number;
@@ -40,6 +42,7 @@ const parseGoogleMapsUrl = (url: string): LocationData | null => {
 };
 
 const AdvertizeBusiness: React.FC = () => {
+    const navigation = useNavigation();
     const [locationUrl, setLocationUrl] = useState('');
     const [shopName, setShopName] = useState('');
     const [addressLine1, setAddressLine1] = useState('');
@@ -128,6 +131,12 @@ const AdvertizeBusiness: React.FC = () => {
                 translucent={true}
             />
             <View style={styles.header}>
+                <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Icon name="arrow-back" size={24} color="#fff" />
+                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Advertise Your Business</Text>
             </View>
             <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -259,12 +268,21 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        position: 'absolute',
+        left: 30,
+        top:35,
+        zIndex: 1,
     },
     headerTitle: {
         color: '#fff',
         fontSize: 20,
         fontWeight: '600',
         textAlign: 'center',
+        flex: 1,
     },
     container: {
         flex: 1,
