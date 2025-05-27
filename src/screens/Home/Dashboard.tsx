@@ -71,21 +71,21 @@ interface DatePickerModalProps {
 }
 
 // Update DatePickerModal component
-const DatePickerModal = ({ 
-    visible, 
-    onClose, 
-    onSelect, 
-    currentDate, 
-    isStartDate, 
+const DatePickerModal = ({
+    visible,
+    onClose,
+    onSelect,
+    currentDate,
+    isStartDate,
     otherDate,
-    showAlert 
+    showAlert
 }: DatePickerModalProps) => {
     const handleDateSelect = (selectedDate: Date) => {
         if (isStartDate) {
             // For start date, check if it's more than 12 months before end date
             const maxStartDate = new Date(otherDate);
             maxStartDate.setMonth(maxStartDate.getMonth() - 12);
-            
+
             if (selectedDate < maxStartDate) {
                 showAlert('Invalid Date', 'Start date cannot be more than 12 months before end date', 'error');
                 return;
@@ -94,7 +94,7 @@ const DatePickerModal = ({
             // For end date, check if it's more than 12 months after start date
             const maxEndDate = new Date(otherDate);
             maxEndDate.setMonth(maxEndDate.getMonth() + 12);
-            
+
             if (selectedDate > maxEndDate) {
                 showAlert('Invalid Date', 'End date cannot be more than 12 months after start date', 'error');
                 return;
@@ -448,16 +448,62 @@ const Dashboard = () => {
             return orderDate >= startDate && orderDate <= endDate;
         });
 
-        const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+        console.log('Filtered Orders:', JSON.stringify(filteredOrders, null, 2));
+        console.log('Pricing Data:', JSON.stringify(pricing, null, 2));
+        console.log('Retailer Markup:', JSON.stringify(markup, null, 2));
+
         const totalOrders = filteredOrders.length;
+
+        // Calculate total profit for each order
+        const totalProfit = filteredOrders.reduce((sum, order) => {
+            console.log('\nProcessing Order:', order.orderId);
+            console.log('Customer:', order.customerName);
+
+            const orderProfit = order.products.reduce((productSum, product) => {
+                // Normalize product title by making lowercase and removing "insole" word
+                const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
+                // Get base price and shipping from pricing data
+                const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
+                const shippingCost = Number(pricing?.Shipping) || 0;
+
+                // Calculate total cost (base price + shipping) * quantity
+                const totalCost = (basePrice + shippingCost) * product.quantity;
+
+                // Get selling price from retailer markup and calculate total markup
+                const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
+                const totalMarkup = markupValue * product.quantity;
+
+                // Calculate profit as total markup - total cost
+                const profit = totalMarkup - totalCost;
+
+                console.log(`\nProduct Details:
+                    Original Title: ${product.title}
+                    Normalized Title: ${normalizedTitle}
+                    Base Price: ${basePrice}
+                    Shipping Cost: ${shippingCost}
+                    Quantity: ${product.quantity}
+                    Total Cost: ${totalCost}
+                    Markup Value: ${markupValue}
+                    Total Markup: ${totalMarkup}
+                    Profit: ${profit}
+                `);
+
+                return productSum + profit;
+            }, 0);
+
+            console.log(`Total profit for order ${order.orderId}: ${orderProfit}`);
+            return sum + orderProfit;
+        }, 0);
+
+        console.log('\nFinal Total Profit:', totalProfit);
 
         // Calculate date range in days
         const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         // Determine the interval based on date range
         let interval: 'day' | 'week' | 'month';
         let dateFormat: Intl.DateTimeFormatOptions;
-        
+
         if (daysDiff <= 7) {
             interval = 'day';
             dateFormat = { weekday: 'short' };
@@ -472,7 +518,7 @@ const Dashboard = () => {
         const chartData = {
             labels: [] as string[],
             orders: [] as number[],
-            revenue: [] as number[]
+            profit: [] as number[]
         };
 
         // Create date points based on interval
@@ -481,7 +527,7 @@ const Dashboard = () => {
 
         while (currentDate <= endDate) {
             datePoints.push(new Date(currentDate));
-            
+
             switch (interval) {
                 case 'day':
                     currentDate.setDate(currentDate.getDate() + 1);
@@ -515,14 +561,37 @@ const Dashboard = () => {
                 return orderDate >= datePoint && orderDate < nextDate;
             });
 
+            // Calculate profit for this period
+            const periodProfit = periodOrders.reduce((sum, order) => {
+                const orderProfit = order.products.reduce((productSum, product) => {
+                    // Normalize product title
+                    const normalizedTitle = product.title.toLowerCase().replace(' insole', '');
+
+                    // Get base price and shipping
+                    const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
+                    const shippingCost = Number(pricing?.Shipping) || 0;
+
+                    // Calculate total cost and markup
+                    const totalCost = (basePrice + shippingCost) * product.quantity;
+                    const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
+                    const totalMarkup = markupValue * product.quantity;
+
+                    // Calculate profit
+                    const profit = totalMarkup - totalCost;
+
+                    return productSum + profit;
+                }, 0);
+                return sum + orderProfit;
+            }, 0);
+
             chartData.labels.push(datePoint.toLocaleDateString('en-US', dateFormat));
             chartData.orders.push(periodOrders.length);
-            chartData.revenue.push(periodOrders.reduce((sum, order) => sum + order.totalAmount, 0));
+            chartData.profit.push(periodProfit);
         });
 
         return {
             totalOrders,
-            totalRevenue,
+            totalProfit,
             chartData
         };
     };
@@ -665,8 +734,8 @@ const Dashboard = () => {
                             <Text style={styles.subText}>Selected Period</Text>
                         </View>
                         <View style={styles.metricCard}>
-                            <Text style={styles.metricTitle}>Revenue Earned ({pricing?.currency || '€'})</Text>
-                            <Text style={styles.bigNumber}>{metrics.totalRevenue.toFixed(2)}</Text>
+                            <Text style={styles.metricTitle}>Total Profit ({pricing?.currency || '€'})</Text>
+                            <Text style={styles.bigNumber}>{metrics.totalProfit.toFixed(2)}</Text>
                             <Text style={styles.subText}>Selected Period</Text>
                         </View>
                     </View>
@@ -695,12 +764,12 @@ const Dashboard = () => {
                     </View>
 
                     <View style={styles.sectionContainer}>
-                        <Text style={styles.sectionTitle}>Revenue Over Time</Text>
+                        <Text style={styles.sectionTitle}>Profit Over Time</Text>
                         <View style={styles.chartContainer}>
                             <LineChart
                                 data={{
                                     labels: metrics.chartData.labels,
-                                    datasets: [{ data: metrics.chartData.revenue }]
+                                    datasets: [{ data: metrics.chartData.profit }]
                                 }}
                                 width={screenWidth}
                                 height={220}
