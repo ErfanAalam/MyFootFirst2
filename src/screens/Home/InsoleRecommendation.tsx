@@ -26,6 +26,55 @@ interface InsolePricing {
   currency: string;
 }
 
+interface InsoleImages {
+  preview: string;
+  thumbnails: string[];
+}
+
+// Add image data for each insole type
+const insoleImages: Record<InsoleType, InsoleImages> = {
+  Sport: {
+    preview: 'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FSport%201.jpg?alt=media&token=5174e292-e874-4da8-8572-d583d66deda4',
+    thumbnails: [
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FSport%201.jpg?alt=media&token=5174e292-e874-4da8-8572-d583d66deda4',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FSport%202.jpg?alt=media&token=f3806d3c-b1f5-41f1-843a-36fc28b5f851',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FSport%204.jpg?alt=media&token=73bcf85b-f7c5-4f61-a0dd-65b704d34bb0',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FSport%205.jpg?alt=media&token=92f4e0ef-756e-42d9-b714-a3fe17ae3a21',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%201.jpg?alt=media&token=e7696206-72d7-403b-85db-44e5d2ad72ce',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%202.jpg?alt=media&token=e980f2c7-cccb-4806-8c63-105fda345f70',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%204.jpg?alt=media&token=c9d4072d-bbf8-4b25-b110-81d95395cdd7',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%205.jpg?alt=media&token=cc48e61e-a2ea-47fb-a83c-6f5dec8511ee',
+    ],
+  },
+  Active: {
+    preview: 'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FActive%201.jpg?alt=media&token=5fe6c496-2f53-4436-9409-056d195bc950',
+    thumbnails: [
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FActive%201.jpg?alt=media&token=5fe6c496-2f53-4436-9409-056d195bc950',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FActive%202.jpg?alt=media&token=860822dc-1109-4f02-b743-4d2968b4aca8',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FActive%203.jpg?alt=media&token=f98cd82c-5438-43ed-8268-a171bc602ee2',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FActive%205.jpg?alt=media&token=6269ed30-8248-4929-b70a-0465e0cf8082',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%201.jpg?alt=media&token=e7696206-72d7-403b-85db-44e5d2ad72ce',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%202.jpg?alt=media&token=e980f2c7-cccb-4806-8c63-105fda345f70',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%204.jpg?alt=media&token=c9d4072d-bbf8-4b25-b110-81d95395cdd7',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%205.jpg?alt=media&token=cc48e61e-a2ea-47fb-a83c-6f5dec8511ee',
+    ],
+  },
+  Comfort: {
+    preview: 'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FComfort%201.jpg?alt=media&token=d95a7d7e-070d-4ee8-8677-796950496d22',
+    thumbnails: [
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FComfort%201.jpg?alt=media&token=d95a7d7e-070d-4ee8-8677-796950496d22',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FComfort%202.jpg?alt=media&token=f70cc6e2-d243-4202-9cbe-22442b3887b1',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FComfort%203.jpg?alt=media&token=d9da7abf-6c91-411e-a19d-a3ea29445279',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FComfort%205.jpg?alt=media&token=595251e1-20ab-4571-8db2-4ba3ae87ff75',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%201.jpg?alt=media&token=e7696206-72d7-403b-85db-44e5d2ad72ce',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%202.jpg?alt=media&token=e980f2c7-cccb-4806-8c63-105fda345f70',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%204.jpg?alt=media&token=c9d4072d-bbf8-4b25-b110-81d95395cdd7',
+      'https://firebasestorage.googleapis.com/v0/b/my-foot-first.firebasestorage.app/o/InsoleImages%2FDress%205.jpg?alt=media&token=cc48e61e-a2ea-47fb-a83c-6f5dec8511ee',
+    ],
+  },
+};
+
+
 const insoleData = {
   Sport: {
     id: 'insole-sport',
@@ -77,6 +126,11 @@ const InsoleRecommendation = () => {
   const [shoeType, setShoeType] = useState('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showShoeTypeError, setShowShoeTypeError] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<Record<InsoleType, string>>({
+    Sport: insoleImages.Sport.preview,
+    Active: insoleImages.Active.preview,
+    Comfort: insoleImages.Comfort.preview,
+  });
 
   // Get the recommended insole type from navigation params
   const recommendedInsole = route.params.recommendedInsole;
@@ -98,6 +152,41 @@ const InsoleRecommendation = () => {
   // Card dimensions
   const CARD_WIDTH = width * 0.8;
   const SPACING = width * 0.03;
+
+  const getCurrencyCode = async (countryName: string): Promise<string> => {
+    try {
+      const res = await fetch(`https://restcountries.com/v3.1/name/${countryName}`);
+      const data = await res.json();
+
+      if (Array.isArray(data) && data.length > 0 && data[0].currencies) {
+        return Object.keys(data[0].currencies)[0];
+      }
+
+      throw new Error('Currency data not found');
+    } catch (err) {
+      console.error('Failed to fetch currency code:', err);
+      return 'EUR';
+    }
+  };
+  // ${toCurrency}
+
+  const getExchangeRate = async (fromCurrency: string): Promise<number> => {
+    try {
+      // Convert from target currency to EUR
+      const res = await fetch(`https://api.frankfurter.app/latest?from=${fromCurrency}&to=EUR`);
+      const data = await res.json();
+
+      if (!data || !data.rates || !data.rates.EUR) {
+        throw new Error('Invalid exchange rate response');
+      }
+
+      // Return the rate to convert from target currency to EUR
+      return data.rates.EUR;
+    } catch (err) {
+      console.error('Failed to fetch exchange rate:', err);
+      return 1; // fallback to 1:1 rate if API fails
+    }
+  };
 
   // Fetch retailer country and pricing from Firestore
   useEffect(() => {
@@ -164,6 +253,14 @@ const InsoleRecommendation = () => {
     }, 100);
   }, [CARD_WIDTH, SPACING]);
 
+  // Add function to handle image selection
+  const handleImageSelect = (insoleType: InsoleType, imageUrl: string) => {
+    setSelectedImages(prev => ({
+      ...prev,
+      [insoleType]: imageUrl
+    }));
+  };
+
   // Function to handle adding insole to cart with dress insole data
   const handleAddToCart = async (insoleType: InsoleType) => {
     if (!pricing) return;
@@ -176,18 +273,34 @@ const InsoleRecommendation = () => {
     const insole = insoleData[insoleType];
     const price = pricing[insoleType] + pricing.Shipping;
 
+    let currencyCode = 'EUR'; // Default to EUR
+    const allowedCurrencies = ['USD', 'EUR', 'INR', 'GBP'];
+
+
+    if (customer?.country) {
+      const fetchedCurrencyCode = await getCurrencyCode(customer.country);
+      if (allowedCurrencies.includes(fetchedCurrencyCode)) {
+        currencyCode = fetchedCurrencyCode;
+      }
+    }
+
+    const exchangeRate = await getExchangeRate(currencyCode);
+
+    // Convert price to EUR
+    const priceInEuro = price * exchangeRate;
+
     // Format the insole data as expected by the cart context
     const product = {
       id: `insole-${insoleType.toLowerCase()}`,
       title: insole.name,
       price: price,
       newPrice: pricing.currency + price,
-      selectedImage: Image.resolveAssetSource(insole.image).uri,
+      selectedImage: selectedImages[insoleType],
       description: insole.features.join(' | '),
       selectedSize: shoeSize.country + ' ' + shoeSize.size,
       selectedColor: 'NoOptions',
       quantity: 1,
-      priceValue: price,
+      priceValue: priceInEuro,
     };
 
     // Add to cart
@@ -208,15 +321,15 @@ const InsoleRecommendation = () => {
               ...cust,
               shoeType: {
                 type: 'Yes',
-                shoesType: shoeType.trim()
-              }
+                shoesType: shoeType.trim(),
+              },
             };
           }
           return cust;
         });
 
         await retailerRef.update({
-          customers: updatedCustomers
+          customers: updatedCustomers,
         });
       } catch (error) {
         console.error('Error updating customer shoes type:', error);
@@ -295,7 +408,39 @@ const InsoleRecommendation = () => {
                   </View>
                 )}
                 <Text style={[styles.cardTitle, isRecommended && styles.recommendedTitle]}>{insole.name}</Text>
-                <Image source={insole.image} style={styles.insoleImage} resizeMode="cover" />
+                {/* Main Image Preview */}
+                <Image
+                  source={{ uri: selectedImages[type] }}
+                  style={styles.insoleImage}
+                  resizeMode="stretch"
+                />
+
+                {/* Thumbnail Gallery */}
+                <ScrollView
+                  showsVerticalScrollIndicator={true}
+                  style={styles.thumbnailContainer}
+                >
+                  <View style={styles.thumbnailGrid}>
+                    {insoleImages[type].thumbnails.map((thumbnail, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => handleImageSelect(type, thumbnail)}
+                        style={[
+                          styles.thumbnailWrapper,
+                          selectedImages[type] === thumbnail && styles.selectedThumbnail
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: thumbnail }}
+                          style={styles.thumbnail}
+                          resizeMode="stretch"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+
+
                 <Text style={styles.priceText}>{pricing.currency}{price}</Text>
                 <View style={styles.featuresContainer}>
                   {insole.features.map((feature, i) => (
@@ -608,6 +753,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     padding: 8,
+  },
+  thumbnailContainer: {
+    marginBottom: 15,
+    paddingHorizontal: 5,
+    width: '100%',
+  },
+  thumbnailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  thumbnailWrapper: {
+    width: '24%', // Leave a little space for margin
+    aspectRatio: 1,
+    margin: '0.5%',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  selectedThumbnail: {
+    borderColor: '#4CAF50',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6,
   },
 });
 

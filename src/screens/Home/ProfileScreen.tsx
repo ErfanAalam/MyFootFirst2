@@ -50,15 +50,6 @@ const ProfileScreen = () => {
         setUserData(null);
         console.log('Employee logged out successfully');
       }
-
-      // Navigate to AuthStack or reset navigation
-      // navigation.reset({
-      //   index: 0,
-      //   routes: [{ name: 'Welcome' }], // or whatever your first auth screen is
-      // });
-
-      // The RootNavigator will automatically redirect to AuthStack
-      // which contains the Welcome screen as its first screen
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -76,7 +67,7 @@ const ProfileScreen = () => {
           <View style={styles.menuContainer}>
             <TouchableOpacity
               style={styles.menuItem}
-            // onPress={() => handleNavigation('ReferralCode')}
+            onPress={() => handleNavigation('AdvertizeBusiness')}
             >
               <Text style={styles.menuItemText}>Advertise Your Business</Text>
             </TouchableOpacity>

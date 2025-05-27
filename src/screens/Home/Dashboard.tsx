@@ -74,7 +74,7 @@ const Dashboard = () => {
     const [employeeName, setEmployeeName] = useState('');
     const [employeeEmail, setEmployeeEmail] = useState('');
     const [employeeRole, setEmployeeRole] = useState<'full_access' | 'half_access'>('half_access');
-    
+
     // Add new state for validation errors
     const [validationErrors, setValidationErrors] = useState({
         name: '',
@@ -609,7 +609,7 @@ const Dashboard = () => {
                     </View>
 
                     <View style={styles.sectionContainer}>
-                        <Text style={styles.sectionTitle}>Revenue Over Time</Text>
+                        <Text style={styles.sectionTitle}>Profit Over Time</Text>
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
@@ -760,7 +760,7 @@ const Dashboard = () => {
                                 <View style={styles.modalContainer}>
                                     <View style={styles.modalHeader}>
                                         <Text style={styles.modalTitle}>Add Employee</Text>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             onPress={() => {
                                                 setModalVisible(false);
                                                 // Reset form when closing
@@ -768,7 +768,7 @@ const Dashboard = () => {
                                                 setEmployeeEmail('');
                                                 setEmployeeRole('half_access');
                                                 setValidationErrors({ name: '', email: '', role: '' });
-                                            }} 
+                                            }}
                                             style={styles.closeButton}
                                         >
                                             <Icon name="close" size={20} color="#000" />
@@ -820,7 +820,7 @@ const Dashboard = () => {
                                     </View>
 
                                     <View style={styles.inputContainer}>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={[
                                                 styles.roleButton,
                                                 validationErrors.role ? styles.inputError : null
@@ -846,7 +846,7 @@ const Dashboard = () => {
                                             <View style={styles.modalContainer}>
                                                 <View style={styles.modalHeader}>
                                                     <Text style={styles.modalTitle}>Select Access Level</Text>
-                                                    <TouchableOpacity 
+                                                    <TouchableOpacity
                                                         onPress={() => {
                                                             setAccessModalVisible(false);
                                                             if (validationErrors.role) {
@@ -858,7 +858,7 @@ const Dashboard = () => {
                                                         <Icon name="close" size={20} color="#000" />
                                                     </TouchableOpacity>
                                                 </View>
-                                                
+
                                                 <TouchableOpacity
                                                     style={[
                                                         styles.roleOption,
@@ -894,7 +894,7 @@ const Dashboard = () => {
                                         </View>
                                     </Modal>
 
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.confirmButton}
                                         onPress={handleConfirm}
                                     >
@@ -906,7 +906,7 @@ const Dashboard = () => {
                     </View>
                 </ScrollView>
             )}
-            
+
             {/* Add CustomAlertModal at the end of the component */}
             <CustomAlertModal
                 visible={alertModal.visible}

@@ -26,6 +26,7 @@ interface CartContextType {
   clearCart: () => void;
   getCartTotal: () => number;
   getItemCount: () => number;
+  RetailerId: String;
 }
 
 // Create context with default values
@@ -37,6 +38,7 @@ const CartContext = createContext<CartContextType>({
   clearCart: () => { },
   getCartTotal: () => 0,
   getItemCount: () => 0,
+  RetailerId: '',
 });
 
 // Custom hook to use cart context
@@ -187,6 +189,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateQuantity = async (productId: string, newQuantity: number, customer: any) => {
     if (!userData?.id || !customerData || newQuantity < 1) return;
 
+    console.log(customer)
+
     try {
       const userDoc = firestore().collection('Retailers').doc(RetailerId);
 
@@ -227,7 +231,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getCartTotal = () => {
     // Ensure we're working with a valid array
     if (!Array.isArray(items)) return 0;
-    return items.reduce((total, item) => total + ((item.priceValue || 0) * (item.quantity || 0)), 0);
+    return items.reduce((total, item) => total + ((item.price || 0) * (item.quantity || 0)), 0);
   };
 
   // Calculate total items
@@ -245,7 +249,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateQuantity,
       clearCart,
       getCartTotal,
-      getItemCount
+      getItemCount,
+      RetailerId
     }}>
       {children}
     </CartContext.Provider>

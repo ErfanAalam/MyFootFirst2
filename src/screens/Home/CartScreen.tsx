@@ -58,7 +58,7 @@ const CartScreen = () => {
 
     let totalPrice = 0;
     items.forEach(item => {
-      totalPrice += item.price * item.quantity;
+      totalPrice += item.priceValue * item.quantity;
     });
 
     setLoading(true);
@@ -255,7 +255,7 @@ const CartScreen = () => {
           <View style={styles.cartFooter}>
             <View style={styles.totalContainer}>
               <Text style={styles.totalLabel}>Total:</Text>
-              <Text style={styles.totalAmount}>${getCartTotal().toFixed(2)}</Text>
+              <Text style={styles.totalAmount}>{items[0].newPrice.slice(0,1)}{getCartTotal().toFixed(2)}</Text>
             </View>
             <TouchableOpacity 
               style={styles.checkoutButton}

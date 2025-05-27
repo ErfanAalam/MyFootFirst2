@@ -19,6 +19,7 @@ import OrthoticSale from '../screens/Home/OrthoticSale';
 import VolumentalScreen from '../Volumental/VolumentalScreen';
 import Messaging from '../screens/Home/Messaging';
 import GoogleRetailer from '../screens/Home/GoogleRetailer';
+import AdvertizeBusiness from '../screens/Home/AdvertizeBusiness';
 const Stack = createNativeStackNavigator();
 
 const RootNavigator = () => {
@@ -45,7 +46,6 @@ const RootNavigator = () => {
                 (
                   <>
                     <Stack.Screen name="GoogleRetailer" component={GoogleRetailer} />
-                    {/* <Stack.Screen name="MainTabs" component={AppTabs} /> */}
                   </>
                 )
                 :
@@ -61,6 +61,7 @@ const RootNavigator = () => {
                     <Stack.Screen name="OrthoticSale" component={OrthoticSale} />
                     <Stack.Screen name="Volumental" component={VolumentalScreen} />
                     <Stack.Screen name="Messaging" component={Messaging} />
+                    <Stack.Screen name="AdvertizeBusiness" component={AdvertizeBusiness} />
                   </>
                 )
             }
