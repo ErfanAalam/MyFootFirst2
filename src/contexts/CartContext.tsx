@@ -107,12 +107,8 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Add product to cart
   const addToCart = async (product: any, quantity: number = 1) => {
-    console.log(userData.id)
-    console.log(customerData)
-    console.log(product)
+
     if (!userData?.id || !customerData) return;
-    console.log(product);
-    console.log(userData)
 
     try {
       const userDoc = firestore().collection('Retailers').doc(RetailerId);

@@ -305,6 +305,8 @@ const InsoleRecommendation = () => {
 
     // Add to cart
 
+    // console.log(product)
+
     addToCart(product);
 
     // If dress insole is selected, update the customer data in Firestore

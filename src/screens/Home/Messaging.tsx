@@ -287,7 +287,7 @@ const Messaging: React.FC = () => {
                 to: selectedConversation.id,
                 text: messageText.trim(),
                 timestamp: firestore.FieldValue.serverTimestamp(),
-                fromName: userData?.contactName,
+                fromName: userData?.contactFirstName,
                 toName: selectedConversation.name,
             });
 

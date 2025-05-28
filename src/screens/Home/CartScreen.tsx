@@ -25,6 +25,7 @@ const CartScreen = () => {
   const navigation = useNavigation();
   const [customerData, setCustomerData] = useState<any>(null);
 
+
   // Load customer data from AsyncStorage
   useEffect(() => {
     const loadCustomerData = async () => {
