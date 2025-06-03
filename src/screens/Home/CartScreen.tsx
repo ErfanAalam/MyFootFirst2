@@ -85,7 +85,7 @@ const CartScreen = () => {
     setIsOrderProcessing(true);
     try {
       const uniqueKey = 'QWERTYUIOPASDFGHJKLZXCVBNM1234567890';
-      const orderId = uniqueKey.split('').sort(() => Math.random() - 0.5).join('').slice(0, 8);
+      const orderId: string = uniqueKey.split('').sort(() => Math.random() - 0.5).join('').slice(0, 8);
 
       // Separate insole products from other products
       const insoleProducts = items.filter(item =>
@@ -107,6 +107,7 @@ const CartScreen = () => {
             quantity: item.quantity,
             image: item.image,
             totalPrice: item.price * item.quantity,
+            markupAtTimeOfSale: item.markupAtTimeOfSale
           })),
           totalAmount: insoleProducts.reduce((sum, item) => sum + (item.price * item.quantity), 0),
           orderStatus: 'pending',

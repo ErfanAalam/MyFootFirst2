@@ -215,7 +215,7 @@ const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
     };
 
     const handleSubmit = async () => {
-        if (!validateForm()) {
+        if (!validateForm() || isSubmitting) {
             return;
         }
 
@@ -236,6 +236,23 @@ const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
         if (isEmployeeLoggedIn || retailerId) {
             try {
                 const retailerRef = firestore().collection('Retailers').doc(retailerId);
+
+                // Check if customer already exists
+                const retailerDoc = await retailerRef.get();
+                const existingCustomers = retailerDoc.data()?.customers || [];
+                const customerExists = existingCustomers.some(
+                    (c: Customer) =>
+                        c.phoneNumber === newCustomer.phoneNumber &&
+                        c.firstName === newCustomer.firstName &&
+                        c.lastName === newCustomer.lastName
+                );
+
+                if (customerExists) {
+                    showAlert('Error', 'Customer already exists with the same details', 'error');
+                    setIsSubmitting(false);
+                    return;
+                }
+
                 await retailerRef.update({
                     customers: firestore.FieldValue.arrayUnion(newCustomer),
                     updatedAt: firestore.FieldValue.serverTimestamp(),
@@ -465,14 +482,19 @@ const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
             />
             <View style={styles.buttonContainer}>
                 <TouchableOpacity
-                    style={[styles.button, styles.backButton]}
-                    onPress={() => { setShowCustomerTypeModal(true); setShowNewCustomerForm(false); }}
+                    style={[styles.button, styles.backButton, isSubmitting && styles.disabledButton]}
+                    onPress={() => {
+                        if (!isSubmitting) {
+                            setShowCustomerTypeModal(true);
+                            setShowNewCustomerForm(false);
+                        }
+                    }}
                     disabled={isSubmitting}
                 >
                     <Text style={styles.buttonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.button, styles.submitButton]}
+                    style={[styles.button, styles.submitButton, isSubmitting && styles.disabledButton]}
                     onPress={handleSubmit}
                     disabled={isSubmitting}
                 >
@@ -530,7 +552,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         borderRadius: 16,
         width: '90%',
-        maxHeight: '80%',
+        maxHeight: '100%',
         position: 'relative',
     },
     modalContent: {
@@ -716,6 +738,9 @@ const styles = StyleSheet.create({
     genderOptionText: {
         fontSize: 16,
         color: '#000',
+    },
+    disabledButton: {
+        opacity: 0.5,
     },
 });
 

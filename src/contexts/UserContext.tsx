@@ -199,7 +199,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoggedIn,
     setUserData,
     hasProfile,
-    setHasProfile
+    setHasProfile,
+    retailerId
   };
 
   return (

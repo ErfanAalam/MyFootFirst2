@@ -33,9 +33,9 @@ type Customer = {
 // Define the navigation types
 type RootStackParamList = {
   Home: undefined;
-  FootScanScreen: { customer: Customer; retailerId: string };
+  FootScanScreen: { customer: Customer; RetailerId: string };
   InsoleQuestions: undefined;
-  OrthoticSale: { customer: Customer; retailerId: string };
+  OrthoticSale: { customer: Customer; RetailerId: string };
   Volumental: undefined;
 };
 
@@ -78,10 +78,10 @@ const HomeScreen = () => {
 
   const handlePainPointSelection = (pointId: string) => {
     if (pointId === "no-pain") {
-      // If selecting "No Pain", clear all other selections
+      // If selecting "No Pain", clear all other selections and only store "no-pain"
       setPainPoints(["no-pain"]);
     } else {
-      // If selecting a pain point
+      // If selecting a specific pain point
       setPainPoints((prev) => {
         // Remove "no-pain" if it exists
         const filtered = prev.filter(id => id !== "no-pain");
@@ -98,6 +98,21 @@ const HomeScreen = () => {
     setAlertVisible(true);
   };
 
+  const checkRetailerMarkup = async (retailerId: string) => {
+    try {
+      const retailerDoc = await firestore()
+        .collection('Retailers')
+        .doc(retailerId)
+        .get();
+
+      const retailerData = retailerDoc.data();
+      return retailerData?.markupHistory?.length > 0;
+    } catch (error) {
+      console.error('Error checking retailer markup:', error);
+      return false;
+    }
+  };
+
   const handleScanFoot = async () => {
     try {
       const auth = getAuth();
@@ -105,6 +120,22 @@ const HomeScreen = () => {
 
       if (!user) {
         showAlert('Error', 'User not logged in', 'error');
+        return;
+      }
+
+      if (!retailerId) {
+        showAlert('Error', 'Retailer ID not found', 'error');
+        return;
+      }
+
+      // Check if retailer has set markup
+      const hasMarkup = await checkRetailerMarkup(retailerId);
+      if (!hasMarkup) {
+        showAlert(
+          'Markup Required',
+          'Please set your markup values in the Dashboard before adding customers.',
+          'error'
+        );
         return;
       }
 
@@ -170,9 +201,9 @@ const HomeScreen = () => {
       const hasSubscription = await checkRetailerSubscription(retailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen", { customer, retailerId: retailerId });
+        navigation.navigate("FootScanScreen", { customer, RetailerId: retailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer, retailerId: retailerId });
+        navigation.navigate("OrthoticSale", { customer, RetailerId: retailerId });
       }
     } catch (error) {
       console.error('Error updating customer data:', error);
@@ -217,9 +248,9 @@ const HomeScreen = () => {
       const hasSubscription = await checkRetailerSubscription(retailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen", { customer, retailerId: retailerId });
+        navigation.navigate("FootScanScreen", { customer, RetailerId: retailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer, retailerId: retailerId });
+        navigation.navigate("OrthoticSale", { customer, RetailerId: retailerId });
       }
     } catch (error) {
       console.error('Error adding new customer:', error);

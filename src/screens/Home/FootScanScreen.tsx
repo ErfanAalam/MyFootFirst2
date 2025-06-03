@@ -400,6 +400,7 @@ const FootScanScreen = () => {
     };
 
     const handleContinue = async () => {
+        console.log(RetailerId)
         try {
             setIsUploading(true);
             setUploadProgress({});
@@ -1076,7 +1077,7 @@ const styles = StyleSheet.create({
         paddingTop: Platform.OS === 'ios' ? 60 : 10,
     },
     summaryHeader: {
-        paddingTop: Platform.OS === 'ios' ? 40 : 10,
+        paddingTop: Platform.OS === 'ios' ? 40 : 30,
         paddingBottom: 10,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
@@ -1136,7 +1137,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     footGuideContainer: {
-        marginTop: 20,
+        marginTop: 30,
         position: 'absolute',
         width: '80%',
         height: '80%',

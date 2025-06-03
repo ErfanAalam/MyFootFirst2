@@ -15,6 +15,13 @@ export interface CartItem {
   image?: string;
   size?: string;
   color?: string,
+  customerId: string;
+  markupAtTimeOfSale?: {
+    Sport: string;
+    Active: string;
+    Comfort: string;
+    timestamp: number;
+  };
 }
 
 // Define context type
@@ -26,7 +33,7 @@ interface CartContextType {
   clearCart: () => void;
   getCartTotal: () => number;
   getItemCount: () => number;
-  RetailerId: String;
+  RetailerId: string;
 }
 
 // Create context with default values
@@ -49,16 +56,21 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [items, setItems] = useState<CartItem[]>([]);
   const { userData } = useUser();
   const [customerData, setCustomerData] = useState<any>(null);
-  const [RetailerId, setRetailerId] = useState<String>('');
+  const [RetailerId, setRetailerId] = useState<string>('');
 
   useEffect(() => {
     if (userData?.RetailerId) {
-      setRetailerId(userData?.RetailerId);
+      setRetailerId(userData.RetailerId.toString());
     } else {
-      const retialerId = AsyncStorage.getItem('Retailerid');
-      setRetailerId(retialerId);
+      const loadRetailerId = async () => {
+        const storedId = await AsyncStorage.getItem('RetailerId');
+        if (storedId) {
+          setRetailerId(storedId);
+        }
+      };
+      loadRetailerId();
     }
-  }, [userData]);
+  }, [userData?.RetailerId]);
 
   // Load customer data from AsyncStorage
   useEffect(() => {
@@ -77,8 +89,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Setup real-time listener for cart changes
   useEffect(() => {
-    if (!userData?.id) {
-      // Ensure items is always an array even when there's no user
+    if (!userData?.id || !RetailerId) {
       setItems([]);
       return;
     }
@@ -88,7 +99,6 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Create a real-time listener
     const unsubscribe = userDoc.onSnapshot((snapshot) => {
       if (snapshot.exists) {
-        // Ensure we're getting an array and not undefined
         const data = snapshot.data();
         const cartItems = Array.isArray(data?.cart) ? data.cart : [];
         setItems(cartItems);
@@ -97,21 +107,28 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }, (error) => {
       console.error("Firestore listener error:", error);
-      // Ensure items is still an array on error
       setItems([]);
     });
 
-    // Clean up listener when component unmounts or userData changes
     return () => unsubscribe();
-  }, [RetailerId]);
+  }, [RetailerId, userData?.id]);
 
   // Add product to cart
   const addToCart = async (product: any, quantity: number = 1) => {
-
     if (!userData?.id || !customerData) return;
 
     try {
       const userDoc = firestore().collection('Retailers').doc(RetailerId);
+      const retailerDoc = await userDoc.get();
+      const retailerData = retailerDoc.data();
+
+      // Get current markup
+      const currentMarkup = retailerData?.currentMarkup || {
+        Sport: '0',
+        Active: '0',
+        Comfort: '0',
+        timestamp: Date.now()
+      };
 
       // Check if product already exists in cart
       const existingItemIndex = items.findIndex(item => item.id === product.id);
@@ -122,18 +139,19 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const newQuantity = existingItem.quantity + quantity;
         await updateQuantity(product.id, newQuantity, customerData);
       } else {
-        // Otherwise add as new item
-        const cartItem = {
+        // Otherwise add as new item with markup at time of sale
+        const cartItem: CartItem = {
           customerId: customerData.id,
           id: product.id,
           title: product.title,
           price: product.price,
           newPrice: product.newPrice,
-          image: product.selectedImage,
-          size: product.selectedSize,
+          image: product.image || product.selectedImage,
+          size: product.selectedSize || '',
           quantity: quantity,
-          color: product.selectedColor,
+          color: product.selectedColor || '',
           priceValue: product.priceValue,
+          markupAtTimeOfSale: currentMarkup
         };
 
         // Get current cart data first

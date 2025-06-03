@@ -21,6 +21,13 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import CustomAlertModal from '../../Components/CustomAlertModal';
 
+interface MarkupHistory {
+    Sport: string;
+    Active: string;
+    Comfort: string;
+    timestamp: number;
+}
+
 interface OrderData {
     orderId: string;
     customerName: string;
@@ -34,6 +41,7 @@ interface OrderData {
         quantity: number;
         image: string;
         totalPrice: number;
+        markupAtTimeOfSale: MarkupHistory;
     }>;
     totalAmount: number;
     orderStatus: string;
@@ -130,6 +138,7 @@ const Dashboard = () => {
         Active: '',
         Comfort: '',
     });
+    const [markupHistory, setMarkupHistory] = useState<MarkupHistory[]>([]);
     const [pricing, setPricing] = useState<InsolePricing | null>(null);
     const [orders, setOrders] = useState<OrderData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -268,9 +277,9 @@ const Dashboard = () => {
         fetchPricing();
     }, [userData?.country]);
 
-    // Fetch existing markup
+    // Fetch existing markup history
     useEffect(() => {
-        const fetchMarkup = async () => {
+        const fetchMarkupHistory = async () => {
             if (!userData?.RetailerId) return;
 
             try {
@@ -281,29 +290,48 @@ const Dashboard = () => {
 
                 if (retailerDoc.exists) {
                     const data = retailerDoc.data();
-                    if (data?.retailerMarkup) {
-                        setMarkup(data.retailerMarkup);
+                    if (data?.markupHistory) {
+                        setMarkupHistory(data.markupHistory);
+                        // Set current markup to the most recent entry
+                        const latestMarkup = data.markupHistory[data.markupHistory.length - 1];
+                        if (latestMarkup) {
+                            setMarkup({
+                                Sport: latestMarkup.Sport,
+                                Active: latestMarkup.Active,
+                                Comfort: latestMarkup.Comfort,
+                            });
+                        }
                     }
                 }
             } catch (error) {
-                console.error('Error fetching markup:', error);
+                console.error('Error fetching markup history:', error);
             }
         };
 
-        fetchMarkup();
+        fetchMarkupHistory();
     }, [userData?.RetailerId]);
 
     const handleMarkupSubmit = async () => {
         if (!userData?.RetailerId) return;
 
         try {
-            await firestore()
-                .collection('Retailers')
-                .doc(userData.RetailerId)
-                .update({
-                    retailerMarkup: markup
-                });
+            const newMarkupEntry: MarkupHistory = {
+                ...markup,
+                timestamp: Date.now()
+            };
 
+            // Get current markup history
+            const retailerRef = firestore().collection('Retailers').doc(userData.RetailerId);
+            const retailerDoc = await retailerRef.get();
+            const currentHistory = retailerDoc.data()?.markupHistory || [];
+
+            // Add new markup entry to history
+            await retailerRef.update({
+                markupHistory: [...currentHistory, newMarkupEntry],
+                currentMarkup: newMarkupEntry // Keep current markup for quick access
+            });
+
+            setMarkupHistory([...currentHistory, newMarkupEntry]);
             showAlert('Success', 'Markup updated successfully', 'success');
         } catch (error) {
             console.error('Error updating markup:', error);
@@ -413,6 +441,23 @@ const Dashboard = () => {
         }
     };
 
+    // Helper function to get markup at a specific date
+    const getMarkupAtDate = (date: number): MarkupHistory => {
+        // Find the most recent markup entry before the given date
+        const markupAtDate = markupHistory
+            .filter(entry => entry.timestamp <= date)
+            .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+        // If no markup found before the date, return the first markup entry
+        // If no markup history at all, return current markup
+        return markupAtDate || markupHistory[0] || {
+            Sport: markup.Sport,
+            Active: markup.Active,
+            Comfort: markup.Comfort,
+            timestamp: Date.now()
+        };
+    };
+
     // Calculate metrics from orders with date filtering
     const calculateMetrics = () => {
         const filteredOrders = orders.filter(order => {
@@ -422,12 +467,13 @@ const Dashboard = () => {
 
         const totalOrders = filteredOrders.length;
 
-        // Calculate total profit for each order
+        // Calculate total profit for each order using markup at time of sale
         const totalProfit = filteredOrders.reduce((sum, order) => {
             const orderProfit = order.products.reduce((productSum, product) => {
+                const markupAtTimeOfSale = product.markupAtTimeOfSale || getMarkupAtDate(order.dateOfOrder);
                 const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
-                const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
-                const totalRevenue = markupValue * product.quantity;
+                const markupValue = Number(markupAtTimeOfSale[normalizedTitle as keyof typeof markupAtTimeOfSale]) || 0;
+                const totalRevenue = (product.price + markupValue) * product.quantity;
                 return productSum + totalRevenue;
             }, 0);
             return sum + orderProfit;
@@ -502,9 +548,10 @@ const Dashboard = () => {
             // Calculate profit for this period using the same logic as total profit
             const periodProfit = periodOrders.reduce((sum, order) => {
                 const orderProfit = order.products.reduce((productSum, product) => {
+                    const markupAtTimeOfSale = product.markupAtTimeOfSale || getMarkupAtDate(order.dateOfOrder);
                     const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
-                    const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
-                    const totalRevenue = markupValue * product.quantity;
+                    const markupValue = Number(markupAtTimeOfSale[normalizedTitle as keyof typeof markupAtTimeOfSale]) || 0;
+                    const totalRevenue = (product.price + markupValue) * product.quantity;
                     return productSum + totalRevenue;
                 }, 0);
                 return sum + orderProfit;
