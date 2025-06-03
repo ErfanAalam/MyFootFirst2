@@ -73,7 +73,7 @@ const EmployeePassword = ({ route }: { route: any }) => {
             }
 
             const matchedEmployee = employeeList[matchedEmployeeIndex];
-
+            
             if (matchedEmployee.password) {
                 // Password already set, verify it
                 if (matchedEmployee.password === password.trim()) {

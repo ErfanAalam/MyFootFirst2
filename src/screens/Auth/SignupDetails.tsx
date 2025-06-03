@@ -62,7 +62,7 @@ const SignupDetails = () => {
   const validateForm = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!businessName || !businessType || !contactFirstName || !contactLastName || !contactRole || !email || !address || !city || !state || !postalCode || !country || !countryCode || !callingCode || !phone) {
+    if (!businessName || !businessType || !contactFirstName || !contactLastName || !contactRole || !email || !address || !city || !state || !postalCode || !country || !countryCode || !callingCode) {
       showAlert("Validation Error", "All required fields must be filled.", 'error');
       return false;
     }

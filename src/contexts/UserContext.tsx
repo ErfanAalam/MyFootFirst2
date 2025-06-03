@@ -1,7 +1,6 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode, useId } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { getApp } from '@react-native-firebase/app';
 import {
-  doc,
   getFirestore,
   query,
   where,
@@ -13,7 +12,6 @@ import {
 } from '@react-native-firebase/auth';
 import { onSnapshot } from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import firestore from '@react-native-firebase/firestore';
 
 interface UserData {
   id: string;

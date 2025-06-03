@@ -48,7 +48,7 @@ const HomeScreen = () => {
   const [painPoints, setPainPoints] = useState<string[]>([]);
   const [alertVisible, setAlertVisible] = useState(false);
   const [customerModalVisible, setCustomerModalVisible] = useState(false);
-  const [RetailerId, setRetailerId] = useState("")
+  const [retailerId, setRetailerId] = useState("")
   const [alertConfig, setAlertConfig] = useState<{
     title: string;
     message: string;
@@ -77,11 +77,20 @@ const HomeScreen = () => {
   }, [userData])
 
   const handlePainPointSelection = (pointId: string) => {
-    setPainPoints((prev) =>
-      prev.includes(pointId)
-        ? prev.filter((id) => id !== pointId)
-        : [...prev, pointId]
-    );
+    if (pointId === "no-pain") {
+      // If selecting "No Pain", clear all other selections
+      setPainPoints(["no-pain"]);
+    } else {
+      // If selecting a pain point
+      setPainPoints((prev) => {
+        // Remove "no-pain" if it exists
+        const filtered = prev.filter(id => id !== "no-pain");
+        // Toggle the selected point
+        return filtered.includes(pointId)
+          ? filtered.filter(id => id !== pointId)
+          : [...filtered, pointId];
+      });
+    }
   };
 
   const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -123,7 +132,7 @@ const HomeScreen = () => {
   const handleCustomerSelect = async (customer: Customer) => {
     setCustomerModalVisible(false);
 
-    if (!RetailerId) {
+    if (!retailerId) {
       showAlert('Error', 'Retailer ID not found', 'error');
       return;
     }
@@ -132,7 +141,7 @@ const HomeScreen = () => {
 
     try {
       // Get the current retailer document
-      const retailerRef = firestore().collection('Retailers').doc(RetailerId);
+      const retailerRef = firestore().collection('Retailers').doc(retailerId);
       const retailerDoc = await retailerRef.get();
       const retailerData = retailerDoc.data();
 
@@ -158,12 +167,12 @@ const HomeScreen = () => {
         customers: updatedCustomers,
       });
 
-      const hasSubscription = await checkRetailerSubscription(RetailerId);
+      const hasSubscription = await checkRetailerSubscription(retailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen", { customer, RetailerId });
+        navigation.navigate("FootScanScreen", { customer, retailerId: retailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer,  RetailerId });
+        navigation.navigate("OrthoticSale", { customer, retailerId: retailerId });
       }
     } catch (error) {
       console.error('Error updating customer data:', error);
@@ -172,7 +181,7 @@ const HomeScreen = () => {
   };
 
   const handleNewCustomerSubmit = async (customer: Customer) => {
-    if (!RetailerId) {
+    if (!retailerId) {
       showAlert('Error', 'Retailer ID not found', 'error');
       return;
     }
@@ -181,7 +190,7 @@ const HomeScreen = () => {
 
     try {
       // Get the current retailer document
-      const retailerRef = firestore().collection('Retailers').doc(RetailerId);
+      const retailerRef = firestore().collection('Retailers').doc(retailerId);
       const retailerDoc = await retailerRef.get();
       const retailerData = retailerDoc.data();
 
@@ -205,12 +214,12 @@ const HomeScreen = () => {
         customers: updatedCustomers,
       });
 
-      const hasSubscription = await checkRetailerSubscription(RetailerId);
+      const hasSubscription = await checkRetailerSubscription(retailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen", { customer, RetailerId });
+        navigation.navigate("FootScanScreen", { customer, retailerId: retailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer, RetailerId });
+        navigation.navigate("OrthoticSale", { customer, retailerId: retailerId });
       }
     } catch (error) {
       console.error('Error adding new customer:', error);
@@ -283,8 +292,6 @@ const HomeScreen = () => {
             <Button
               mode="contained"
               style={styles.nextButton}
-              // onPress={() => navigation.navigate("OrthoticSale")}
-              // onPress={() => navigation.navigate("Volumental")}
               onPress={handleScanFoot}
             >
               <Text style={styles.buttonText}>Scan Your Foot</Text>

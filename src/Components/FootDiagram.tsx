@@ -1,12 +1,14 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity, Text, Image } from "react-native";
-import { Svg, Circle, Rect } from "react-native-svg";
+import { Svg, Rect } from "react-native-svg";
 
 interface FootDiagramProps {
   foot: "left" | "right";
   selectedPoints: string[];
   onSelectPoint: (point: string) => void;
 }
+
+const NO_PAIN_ID = "no-pain";
 
 // (Your LeftPainPoints and RightPainPoints here)
 // Create left and right foot pain points with unique IDs
@@ -46,12 +48,28 @@ const FootDiagram: React.FC<FootDiagramProps> = ({
 
   const getAdjustedX = (x: number) => (foot === "right" ? 300 - x : x);
 
+  const handlePointSelection = (pointId: string) => {
+    if (pointId === NO_PAIN_ID) {
+      // If selecting "No Pain", clear all other selections
+      onSelectPoint(NO_PAIN_ID);
+    } else {
+      // If selecting a pain point, remove "No Pain" if it's selected
+      if (selectedPoints.includes(NO_PAIN_ID)) {
+        onSelectPoint(NO_PAIN_ID);
+      }
+      onSelectPoint(pointId);
+    }
+  };
+
+  // Check if any pain points are selected (excluding NO_PAIN_ID)
+  const hasPainPointsSelected = selectedPoints.some(point => point !== NO_PAIN_ID);
+
   return (
     <View style={styles.container}>
       <Image
         source={
           foot === "left"
-            ? require("../assets/images/leftFoot.png") // ✅ fixed path
+            ? require("../assets/images/leftFoot.png")
             : require("../assets/images/rightFoot.png")
         }
         style={styles.footImage}
@@ -73,7 +91,7 @@ const FootDiagram: React.FC<FootDiagramProps> = ({
                 ? "#00843D"
                 : "rgba(58, 56, 56, 0.5)"
             }
-            onPress={() => onSelectPoint(point.id)}
+            onPress={() => handlePointSelection(point.id)}
           />
         ))}
       </Svg>
@@ -83,7 +101,7 @@ const FootDiagram: React.FC<FootDiagramProps> = ({
           <TouchableOpacity
             key={point.id}
             style={styles.legendItem}
-            onPress={() => onSelectPoint(point.id)}
+            onPress={() => handlePointSelection(point.id)}
           >
             <View
               style={[
@@ -94,6 +112,18 @@ const FootDiagram: React.FC<FootDiagramProps> = ({
             <Text style={styles.legendText}>{point.label}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={styles.legendItem}
+          onPress={() => handlePointSelection(NO_PAIN_ID)}
+        >
+          <View
+            style={[
+              styles.legendDot,
+              (!hasPainPointsSelected || selectedPoints.includes(NO_PAIN_ID)) && styles.selectedDot,
+            ]}
+          />
+          <Text style={styles.legendText}>I have no pain to report</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -101,7 +131,6 @@ const FootDiagram: React.FC<FootDiagramProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    // alignItems: "center",
     position: "relative",
   },
   footImage: {

@@ -1,22 +1,21 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, Image, ScrollView, Animated, Platform, Button, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, Button, Modal, ActivityIndicator } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { accelerometer, SensorTypes, setUpdateIntervalForType } from 'react-native-sensors';
 import { Subscription } from 'rxjs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { WebView } from 'react-native-webview';
 import storage from '@react-native-firebase/storage';
-import firestore from '@react-native-firebase/firestore';
-import auth from '@react-native-firebase/auth';
+import { getFirestore, doc, setDoc, serverTimestamp } from '@react-native-firebase/firestore';
+import { getAuth } from '@react-native-firebase/auth';
 import CustomAlertModal from '../../Components/CustomAlertModal';
 
 
 // Define the types for our foot images
 type FootImage = {
     path: string;
-    type: 'left' | 'right' | 'front';
+    type: 'left' | 'right' | 'top';
     foot: 'left' | 'right';
 };
 
@@ -40,16 +39,16 @@ const FootScanScreen = () => {
     const [capturedImages, setCapturedImages] = useState<FootImage[]>([]);
     const [showPreview, setShowPreview] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
+    const [showInitialPopup, setShowInitialPopup] = useState(true);
     const [currentImage, setCurrentImage] = useState<string | null>(null);
     const [currentFoot, setCurrentFoot] = useState<'left' | 'right'>('left');
-    const [currentView, setCurrentView] = useState<'left' | 'right' | 'front'>('left');
+    const [currentView, setCurrentView] = useState<'left' | 'right' | 'top'>('left');
     const [isOrientationCorrect, setIsOrientationCorrect] = useState(false);
     const [isDetectingSheet, setIsDetectingSheet] = useState(false);
     const navigation = useNavigation();
     const { hasPermission, requestPermission } = useCameraPermission();
     const device = useCameraDevice('back');
     const camera = useRef<Camera>(null);
-    const { width, height } = Dimensions.get('window');
 
     const route = useRoute();
     const { customer, RetailerId } = route.params as FootScanScreenParams;
@@ -60,6 +59,7 @@ const FootScanScreen = () => {
     // volumental webview page
     const [showWebView, setShowWebView] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
 
     const [alertModal, setAlertModal] = useState({
         visible: false,
@@ -116,14 +116,14 @@ const FootScanScreen = () => {
                 );
 
                 const scanData = scanResponse.data;
-                const user = auth().currentUser;
+                const user = getAuth().currentUser;
 
                 if (!user) {
                     throw new Error('User not authenticated');
                 }
 
                 // Check if measurements already exist and update instead of creating new
-                const measurementsRef = firestore()
+                const measurementsRef = getFirestore()
                     .collection('Retailers')
                     .doc(RetailerId)
                     .collection('measurements')
@@ -136,7 +136,7 @@ const FootScanScreen = () => {
                     meshes: scanData.meshes,
                     scanType: scanData.scan_type,
                     success: scanData.success,
-                    storedAt: firestore.FieldValue.serverTimestamp(),
+                    storedAt: serverTimestamp(),
                 }, { merge: true });
 
 
@@ -245,7 +245,7 @@ const FootScanScreen = () => {
                     return x < -7 && isNotTiltedForward;
                 }
 
-            case 'front':
+            case 'top':
                 // For front view, phone should be vertical with minimal tilt
                 return Math.abs(x) < 0.3 && Math.abs(y) < 0.3 && Math.abs(z) > 9;
 
@@ -325,7 +325,7 @@ const FootScanScreen = () => {
             setCapturedImages((prev) => [...prev, newImage]);
         }
         // Move to the next view or foot
-        if (currentView === 'front') {
+        if (currentView === 'top') {
             if (currentFoot === 'right') {
                 // We've captured all images
                 showAlert('Complete', 'All foot images have been captured!', 'success');
@@ -339,7 +339,7 @@ const FootScanScreen = () => {
             }
         } else if (currentView === 'right') {
             // Move to the front view
-            setCurrentView('front');
+            setCurrentView('top');
             setShowPreview(false);
         } else {
             // Move to the right view
@@ -356,92 +356,147 @@ const FootScanScreen = () => {
         setCurrentView('left');
     };
 
+    const uploadImage = async (image: FootImage, timestamp: number): Promise<any> => {
+        try {
+            const auth = getAuth();
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                throw new Error('No authenticated user found during upload');
+            }
+
+            await currentUser.getIdToken(true);
+            const filename = `${customer.id}/${timestamp}_${image.foot}_${image.type}.jpg`;
+            const storageRef = storage().ref(filename);
+            const uploadTask = storageRef.putFile(image.path);
+
+            uploadTask.on('state_changed',
+                (snapshot: { bytesTransferred: number; totalBytes: number }) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(prev => ({
+                        ...prev,
+                        [filename]: progress
+                    }));
+                },
+                (error: { code: string; message: string }) => {
+                    throw error;
+                }
+            );
+
+            await uploadTask;
+            const url = await storageRef.getDownloadURL();
+
+            return {
+                foot: image.foot,
+                type: image.type,
+                url: url,
+                timestamp: timestamp,
+            };
+        } catch (error: any) {
+            if (error.code === 'storage/unauthorized') {
+                showAlert('Error', 'Authentication error. Please sign out and sign in again.', 'error');
+            }
+            throw error;
+        }
+    };
+
     const handleContinue = async () => {
         try {
             setIsUploading(true);
+            setUploadProgress({});
+
+            const auth = getAuth();
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                showAlert('Error', 'Please sign in to upload images', 'error');
+                setIsUploading(false);
+                return;
+            }
 
             if (!RetailerId) {
-                showAlert('Error', 'User not authenticated', 'error');
+                showAlert('Error', 'Retailer ID is required', 'error');
+                setIsUploading(false);
+                return;
+            }
+
+            if (!customer || !customer.id) {
+                showAlert('Error', 'Customer information missing', 'error');
+                setIsUploading(false);
+                return;
+            }
+
+            if (capturedImages.length === 0) {
+                showAlert('Error', 'No images captured', 'error');
+                setIsUploading(false);
                 return;
             }
 
             const timestamp = new Date().getTime();
-            const uploadedImages = [];
 
-            // First, check for existing images
-            const existingImagesRef = firestore()
-                .collection('Retailers')
-                .doc(RetailerId)
-                .collection('scanned_images')
-                .orderBy('createdAt', 'desc')
-                .limit(1);
-
-            const existingImagesSnapshot = await existingImagesRef.get();
-            const existingImagesDoc = existingImagesSnapshot.docs[0];
-            const existingImages = existingImagesDoc?.data()?.images || [];
-
-            // Delete existing images from Firebase Storage
-            for (const existingImage of existingImages) {
-                try {
-                    const oldFilename = `${customer.id}/${existingImage.timestamp}_${existingImage.foot}_${existingImage.type}.jpg`;
-                    const oldReference = storage().ref(oldFilename);
-                    await oldReference.delete();
-                } catch (error) {
-                    console.warn('Error deleting old image:', error);
-                    // Continue with upload even if deletion fails
-                }
+            // Test storage access
+            try {
+                const storageInstance = storage();
+                const testRef = storageInstance.ref('test-access.txt');
+                await testRef.putString('test');
+                await testRef.delete();
+            } catch (error: any) {
+                showAlert('Error', 'Storage access error. Please check your permissions.', 'error');
+                setIsUploading(false);
+                return;
             }
 
-            // Upload new images to Firebase Storage
-            for (const image of capturedImages) {
-                try {
-                    const filename = `${customer.id}/${timestamp}_${image.foot}_${image.type}.jpg`;
-                    const reference = storage().ref(filename);
+            const db = getFirestore();
+            const existingImagesRef = doc(db, 'Retailers', RetailerId, 'scanned_images', customer.id);
 
-                    await reference.putFile(image.path);
-                    const url = await reference.getDownloadURL();
+            try {
+                const existingImagesDoc = await existingImagesRef.get();
+                const existingImages = existingImagesDoc?.data()?.images || [];
 
-                    uploadedImages.push({
-                        foot: image.foot,
-                        type: image.type,
-                        url: url,
-                        timestamp: timestamp,
+                if (existingImages.length > 0) {
+                    const storageInstance = storage();
+                    const deletePromises = existingImages.map(async (existingImage: any) => {
+                        try {
+                            const oldFilename = `${customer.id}/${existingImage.timestamp}_${existingImage.foot}_${existingImage.type}.jpg`;
+                            const oldReference = storageInstance.ref(oldFilename);
+                            await oldReference.delete();
+                        } catch (error: any) {
+                            // Continue even if deletion fails
+                        }
                     });
-                } catch (error) {
-                    console.error('Error uploading image:', error);
-                    throw new Error(`Failed to upload ${image.foot} foot ${image.type} view`);
+                    await Promise.all(deletePromises);
                 }
-            }
 
-            // Update or create new document in Firestore
-            if (existingImagesDoc) {
-                // Update existing document
-                await existingImagesDoc.ref.update({
+                const uploadPromises = capturedImages.map(image => uploadImage(image, timestamp));
+                const uploadedImages = await Promise.all(uploadPromises);
+
+                const updateData = {
                     images: uploadedImages,
-                    updatedAt: firestore.FieldValue.serverTimestamp(),
+                    updatedAt: serverTimestamp(),
                     status: 'completed',
-                });
-            } else {
-                // Create new document
-                await firestore()
-                    .collection('Retailers')
-                    .doc(RetailerId)
-                    .collection('scanned_images')
-                    .doc(customer.id)
-                    .set({
-                        images: uploadedImages,
-                        createdAt: firestore.FieldValue.serverTimestamp(),
-                        status: 'completed',
-                    });
-            }
+                };
 
-            showAlert('Success', 'All images have been updated successfully!', 'success');
-            setShowWebView(true);
-        } catch (error) {
-            console.error('Error in handleContinue:', error);
-            showAlert('Error', 'Failed to upload images. Please try again.', 'error');
+                await setDoc(existingImagesRef, updateData, { merge: true });
+                showAlert('Success', 'All images have been updated successfully!', 'success');
+                setShowWebView(true);
+            } catch (error: any) {
+                let errorMessage = 'Failed to upload images. ';
+
+                if (error.code === 'storage/unauthorized') {
+                    errorMessage += 'Authentication error. Please sign out and sign in again.';
+                } else if (error.code === 'storage/canceled') {
+                    errorMessage += 'Upload was canceled.';
+                } else if (error.code === 'storage/unknown') {
+                    errorMessage += 'Network error. Please check your internet connection.';
+                } else if (error.code === 'permission-denied') {
+                    errorMessage += 'Permission denied. Please check your access rights.';
+                } else {
+                    errorMessage += error.message || 'Please try again.';
+                }
+
+                showAlert('Error', errorMessage, 'error');
+            }
         } finally {
             setIsUploading(false);
+            setUploadProgress({});
         }
     };
 
@@ -491,7 +546,7 @@ const FootScanScreen = () => {
                 }
                 dy = debugInfo.y * -SENSITIVITY_Y;
                 break;
-            case 'front':
+            case 'top':
                 // For front view, phone should be vertical with minimal tilt
                 dx = debugInfo.x * (currentFoot === 'left' ? -SENSITIVITY_X : SENSITIVITY_X);
                 dy = debugInfo.y * -SENSITIVITY_Y;
@@ -534,7 +589,7 @@ const FootScanScreen = () => {
                 <View style={styles.footGuideHeader}>
                     <Text style={styles.footGuideTitle}>{currentFoot === 'left' ? 'Left' : 'Right'} Foot</Text>
                     <Text style={styles.footGuideSubtitle}>
-                        {currentView === 'left' ? 'Outside' : currentView === 'right' ? 'Inside' : 'Top'} View
+                        {currentView === 'left' ? 'Left' : currentView === 'right' ? 'Right' : 'Top'} View
                     </Text>
                 </View>
 
@@ -544,7 +599,11 @@ const FootScanScreen = () => {
 
     const renderCamera = () => {
         if (!device) {
-            return <Text>Loading camera...</Text>;
+            return (
+                <View style={styles.cameraLoadingContainer}>
+                    <Text style={styles.cameraLoadingText}>Loading camera...</Text>
+                </View>
+            );
         }
 
         if (showPreview && currentImage) {
@@ -561,7 +620,6 @@ const FootScanScreen = () => {
                         <TouchableOpacity
                             style={[styles.saveButton]}
                             onPress={handleSave}
-                        // disabled={!isOrientationCorrect}
                         >
                             <Text style={styles.buttonText}>Save</Text>
                         </TouchableOpacity>
@@ -574,7 +632,7 @@ const FootScanScreen = () => {
             <View style={styles.cameraContainer}>
                 <Camera
                     ref={camera}
-                    style={[styles.camera, { width, height }]}
+                    style={StyleSheet.absoluteFill}
                     device={device}
                     isActive={true}
                     photo={true}
@@ -583,7 +641,7 @@ const FootScanScreen = () => {
                 <View style={styles.overlay}>
                     {renderFootGuide()}
                     <View style={styles.floatingMessage}>
-                        <Text style={styles.floatingMessageText}>Please take the image from closer to get better quality</Text>
+                        <Text style={styles.floatingMessageText}>Position your foot closer to the camera for better quality. Avoid white floors for optimal results.</Text>
                     </View>
                 </View>
                 <TouchableOpacity
@@ -604,62 +662,62 @@ const FootScanScreen = () => {
 
     const renderProgress = () => {
         return (
-            <SafeAreaProvider>
-                <View style={styles.progressContainer}>
-                    <Text style={styles.progressTitle}>Capture Progress:</Text>
-                    <View style={styles.progressGrid}>
-                        <View style={styles.progressColumn}>
-                            <Text style={styles.footLabel}>Left Foot</Text>
-                            <View style={[
-                                styles.progressItem,
-                                capturedImages.some(img => img.foot === 'left' && img.type === 'left') ? styles.completed : {}
-                            ]}>
-                                <Text style={styles.progressText}>Left View</Text>
-                            </View>
-                            <View style={[
-                                styles.progressItem,
-                                capturedImages.some(img => img.foot === 'left' && img.type === 'right') ? styles.completed : {}
-                            ]}>
-                                <Text style={styles.progressText}>Right View</Text>
-                            </View>
-                            <View style={[
-                                styles.progressItem,
-                                capturedImages.some(img => img.foot === 'left' && img.type === 'front') ? styles.completed : {}
-                            ]}>
-                                <Text style={styles.progressText}>Front View</Text>
-                            </View>
+            <View style={[styles.progressContainer, Platform.OS === 'ios' && styles.progressContainerIOS]}>
+                <Text style={[styles.progressTitle, Platform.OS === 'ios' && styles.progressTitleIOS]}>Capture Progress:</Text>
+                <View style={styles.progressGrid}>
+                    <View style={styles.progressColumn}>
+                        <Text style={styles.footLabel}>Left Foot</Text>
+                        <View style={[
+                            styles.progressItem,
+                            capturedImages.some(img => img.foot === 'left' && img.type === 'left') ? styles.completed : {}
+                        ]}>
+                            <Text style={styles.progressText}>Left View</Text>
                         </View>
-                        <View style={styles.progressColumn}>
-                            <Text style={styles.footLabel}>Right Foot</Text>
-                            <View style={[
-                                styles.progressItem,
-                                capturedImages.some(img => img.foot === 'right' && img.type === 'left') ? styles.completed : {}
-                            ]}>
-                                <Text style={styles.progressText}>Left View</Text>
-                            </View>
-                            <View style={[
-                                styles.progressItem,
-                                capturedImages.some(img => img.foot === 'right' && img.type === 'right') ? styles.completed : {}
-                            ]}>
-                                <Text style={styles.progressText}>Right View</Text>
-                            </View>
-                            <View style={[
-                                styles.progressItem,
-                                capturedImages.some(img => img.foot === 'right' && img.type === 'front') ? styles.completed : {}
-                            ]}>
-                                <Text style={styles.progressText}>Front View</Text>
-                            </View>
+                        <View style={[
+                            styles.progressItem,
+                            capturedImages.some(img => img.foot === 'left' && img.type === 'right') ? styles.completed : {}
+                        ]}>
+                            <Text style={styles.progressText}>Right View</Text>
+                        </View>
+                        <View style={[
+                            styles.progressItem,
+                            capturedImages.some(img => img.foot === 'left' && img.type === 'top') ? styles.completed : {}
+                        ]}>
+                            <Text style={styles.progressText}>Top View</Text>
+                        </View>
+                    </View>
+                    <View style={styles.progressColumn}>
+                        <Text style={styles.footLabel}>Right Foot</Text>
+                        <View style={[
+                            styles.progressItem,
+                            capturedImages.some(img => img.foot === 'right' && img.type === 'left') ? styles.completed : {}
+                        ]}>
+                            <Text style={styles.progressText}>Left View</Text>
+                        </View>
+                        <View style={[
+                            styles.progressItem,
+                            capturedImages.some(img => img.foot === 'right' && img.type === 'right') ? styles.completed : {}
+                        ]}>
+                            <Text style={styles.progressText}>Right View</Text>
+                        </View>
+                        <View style={[
+                            styles.progressItem,
+                            capturedImages.some(img => img.foot === 'right' && img.type === 'top') ? styles.completed : {}
+                        ]}>
+                            <Text style={styles.progressText}>Top View</Text>
                         </View>
                     </View>
                 </View>
-            </SafeAreaProvider>
+            </View>
         );
     };
 
     const renderSummary = () => {
         return (
-            <View style={styles.summaryContainer}>
-                <Text style={styles.summaryTitle}>Foot Scan Summary</Text>
+            <View style={[styles.summaryContainer, Platform.OS === 'ios' && styles.summaryContainerIOS]}>
+                <View style={styles.summaryHeader}>
+                    <Text style={styles.summaryTitle}>Foot Scan Summary</Text>
+                </View>
                 <ScrollView style={styles.summaryScrollView}>
                     <View style={styles.summaryGrid}>
                         <View style={styles.summaryColumn}>
@@ -712,8 +770,12 @@ const FootScanScreen = () => {
                     >
                         {isUploading ? (
                             <View style={styles.loadingContainer}>
-                                <ActivityIndicator color="white" />
-                                <Text style={[styles.buttonText, styles.loadingText]}>Uploading...</Text>
+                                <ActivityIndicator color="white" size="small" />
+                                <Text style={[styles.buttonText, styles.loadingText]}>
+                                    {Object.keys(uploadProgress).length > 0
+                                        ? `Uploading ${Math.round(Object.values(uploadProgress).reduce((a, b) => a + b, 0) / Object.keys(uploadProgress).length)}%`
+                                        : 'Uploading...'}
+                                </Text>
                             </View>
                         ) : (
                             <Text style={styles.buttonText}>Continue</Text>
@@ -722,24 +784,69 @@ const FootScanScreen = () => {
 
                     <Modal visible={showWebView} animationType="slide">
                         <WebView
-                            source={{ uri: 'file:///android_asset/volumental.html' }}
+                            source={getWebViewSource()}
                             originWhitelist={['*']}
                             style={{ flex: 1 }}
                             onMessage={handleMessage}
                             javaScriptEnabled={true}
                             allowsInlineMediaPlayback={true}
                             mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+                            // Add iOS specific props
+                            {...(Platform.OS === 'ios' && {
+                                allowsBackForwardNavigationGestures: true,
+                                allowsLinkPreview: false,
+                            })}
                         />
-                        <Button title="Close" onPress={() => setShowWebView(false)} />
+                        <View style={[styles.webViewCloseButton, Platform.OS === 'ios' && styles.webViewCloseButtonIOS]}>
+                            <Button title="Close" onPress={() => setShowWebView(false)} />
+                        </View>
                     </Modal>
                 </View>
             </View>
         );
     };
 
+    // Add this new component for the initial popup
+    const renderInitialPopup = () => {
+        return (
+            <Modal
+                visible={showInitialPopup}
+                transparent={true}
+                animationType="fade"
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Important Instructions</Text>
+                        <Text style={styles.modalText}>
+                            Please take a close-up photo along with A4 page at bottom of your feet to ensure accurate data for custom orthotics
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.modalButton}
+                            onPress={() => setShowInitialPopup(false)}
+                        >
+                            <Text style={styles.modalButtonText}>I Understand</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
+
+    // Function to get the correct WebView source based on platform
+    const getWebViewSource = () => {
+        if (Platform.OS === 'android') {
+            return { uri: 'file:///android_asset/volumental.html' };
+        } else {
+            // For iOS, we need to use the bundle URL
+            return { uri: 'volumental.html' };
+        }
+    };
+
+    // Modify the main return statement to ensure progress is always rendered
     if (!hasPermission) {
         return (
             <View style={styles.container}>
+                {renderInitialPopup()}
                 <Text>No access to camera</Text>
                 <TouchableOpacity
                     style={styles.permissionButton}
@@ -754,6 +861,7 @@ const FootScanScreen = () => {
     if (!device) {
         return (
             <View style={styles.container}>
+                {renderInitialPopup()}
                 <Text>No camera device found</Text>
             </View>
         );
@@ -768,16 +876,25 @@ const FootScanScreen = () => {
     }
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Scan Your Feet</Text>
-            {renderProgress()}
-            {renderCamera()}
+        <View style={[styles.container, Platform.OS === 'ios' && styles.containerIOS]}>
+            {renderInitialPopup()}
+            <Text style={[styles.title, Platform.OS === 'ios' && styles.titleIOS]}>Scan Your Feet</Text>
+
+            {/* Progress Section - Always render */}
+            <View style={styles.progressSection}>
+                {renderProgress()}
+            </View>
+
+            {/* Camera Section */}
+            <View style={styles.cameraSection}>
+                {renderCamera()}
+            </View>
+
             <TouchableOpacity
-                style={styles.nextButton}
-                // onPress={() => navigation.goBack()}
-                onPress={() => {navigation.navigate('InsoleQuestions',{customer: customer,RetailerId: RetailerId});}}
+                style={[styles.nextButton, Platform.OS === 'ios' && styles.nextButtonIOS]}
+                onPress={() => navigation.goBack()}
             >
-                <Text style={styles.nextText}>Cancel</Text>
+                <Text style={[styles.nextText, Platform.OS === 'ios' && styles.nextTextIOS]}>Cancel</Text>
             </TouchableOpacity>
             <CustomAlertModal
                 visible={alertModal.visible}
@@ -793,76 +910,113 @@ const FootScanScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        backgroundColor: '#fff',
     },
     title: {
         fontSize: 24,
         fontWeight: 'bold',
+        textAlign: 'center',
+        marginTop: Platform.OS === 'ios' ? 50 : 40,
         marginBottom: 10,
     },
-    cameraContainer: {
-        flex: 3,
-        width: '80%',
-        justifyContent: 'center',
-        alignItems: 'center',
+    // Progress Section Styles
+    progressSection: {
+        width: '100%',
+        paddingHorizontal: 10,
+        paddingTop: 10,
+        paddingBottom: 5,
+        backgroundColor: '#fff',
+        zIndex: 1, // Ensure progress stays on top
     },
-    camera: {
+    progressContainer: {
+        width: '100%',
+        padding: 10,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 10,
+        elevation: 2, // Add elevation for Android
+        shadowColor: '#000', // Add shadow for iOS
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    // Camera Section Styles
+    cameraSection: {
+        flex: 3,
+        width: '100%',
+        backgroundColor: '#000',
+        position: 'relative', // Ensure proper stacking
+        overflow: 'hidden', // Add this to contain the camera
+    },
+    cameraContainer: {
         flex: 1,
         width: '100%',
-        height: '100%',
+        position: 'relative',
+        backgroundColor: '#000',
+    },
+    cameraLoadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000',
+    },
+    cameraLoadingText: {
+        color: '#fff',
+        fontSize: 16,
     },
     overlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    boundary: {
-        width: 200,
-        height: 200,
-        borderWidth: 2,
-        borderColor: 'red',
-        borderRadius: 10,
+    previewContainer: {
+        flex: 1,
+        width: '100%',
+        backgroundColor: '#000',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    instructionText: {
-        position: 'absolute',
-        top: -80,
-        color: 'white',
-        fontSize: 18,
-        fontWeight: 'bold',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        padding: 10,
-        borderRadius: 5,
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'contain',
     },
-    viewText: {
+    previewButtons: {
         position: 'absolute',
-        top: 60,
-        color: 'white',
-        fontSize: 16,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        padding: 8,
-        borderRadius: 5,
+        bottom: 20,
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        width: '100%',
+        paddingHorizontal: 20,
     },
     captureButton: {
         position: 'absolute',
-        bottom: 20,
-        backgroundColor: 'green',
+        bottom: Platform.OS === 'ios' ? 40 : 20,
+        alignSelf: 'center',
+        backgroundColor: '#00843D',
         padding: 15,
         borderRadius: 50,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
     captureText: {
         color: 'white',
         fontSize: 18,
     },
     nextButton: {
-        marginTop: 20,
+        margin: 5,
         padding: 10,
         backgroundColor: '#00843D',
         borderRadius: 5,
+        alignItems: 'center',
     },
     nextText: {
         color: '#fff',
@@ -877,50 +1031,6 @@ const styles = StyleSheet.create({
     permissionButtonText: {
         color: '#fff',
         fontSize: 16,
-    },
-    previewContainer: {
-        flex: 1,
-        width: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 60,
-    },
-    previewImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'contain',
-    },
-    previewButtons: {
-        position: 'absolute',
-        bottom: 20,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-    },
-    retakeButton: {
-        backgroundColor: 'red',
-        padding: 15,
-        borderRadius: 50,
-        width: 120,
-        alignItems: 'center',
-    },
-    saveButton: {
-        backgroundColor: 'green',
-        padding: 15,
-        borderRadius: 50,
-        width: 120,
-        alignItems: 'center',
-    },
-    buttonText: {
-        color: 'white',
-        fontSize: 18,
-    },
-    progressContainer: {
-        width: '100%',
-        padding: 10,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 10,
-        marginBottom: 10,
     },
     progressTitle: {
         fontSize: 16,
@@ -960,12 +1070,23 @@ const styles = StyleSheet.create({
         flex: 1,
         width: '100%',
         padding: 10,
+        backgroundColor: '#fff',
+    },
+    summaryContainerIOS: {
+        paddingTop: Platform.OS === 'ios' ? 60 : 10,
+    },
+    summaryHeader: {
+        paddingTop: Platform.OS === 'ios' ? 40 : 10,
+        paddingBottom: 10,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
     },
     summaryTitle: {
         fontSize: 24,
         fontWeight: 'bold',
         textAlign: 'center',
-        marginBottom: 10,
+        color: '#000',
     },
     summaryScrollView: {
         flex: 1,
@@ -1015,8 +1136,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     footGuideContainer: {
+        marginTop: 20,
         position: 'absolute',
-        width: '90%',
+        width: '80%',
         height: '80%',
         borderWidth: 2,
         borderRadius: 10,
@@ -1089,7 +1211,7 @@ const styles = StyleSheet.create({
     floatingMessage: {
         position: 'absolute',
         top: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: 'rgb(0, 0, 0)',
         padding: 10,
         borderRadius: 5,
         width: '100%',
@@ -1105,9 +1227,102 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingHorizontal: 10,
     },
     loadingText: {
+        fontSize: 16,
         marginLeft: 10,
+        color: '#fff',
+        flexShrink: 1,
+    },
+    // iOS specific styles
+    containerIOS: {
+        paddingTop: Platform.OS === 'ios' ? 50 : 0,
+    },
+    titleIOS: {
+        fontSize: 28,
+        marginTop: 20,
+    },
+    progressContainerIOS: {
+        marginTop: 20,
+        marginBottom: 20,
+        paddingHorizontal: 20,
+    },
+    progressTitleIOS: {
+        fontSize: 18,
+    },
+    nextButtonIOS: {
+        marginBottom: Platform.OS === 'ios' ? 30 : 20,
+    },
+    nextTextIOS: {
+        fontSize: 18,
+    },
+    webViewCloseButton: {
+        position: 'absolute',
+        bottom: 20,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+    },
+    webViewCloseButtonIOS: {
+        bottom: 40, // More space from bottom on iOS
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderRadius: 15,
+        padding: 20,
+        width: '80%',
+        maxWidth: 400,
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        textAlign: 'center',
+        color: '#00843D',
+    },
+    modalText: {
+        fontSize: 16,
+        textAlign: 'center',
+        marginBottom: 20,
+        lineHeight: 24,
+    },
+    modalButton: {
+        backgroundColor: '#00843D',
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        borderRadius: 25,
+        marginTop: 10,
+    },
+    modalButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    retakeButton: {
+        backgroundColor: 'red',
+        padding: 15,
+        borderRadius: 50,
+        width: 120,
+        alignItems: 'center',
+    },
+    saveButton: {
+        backgroundColor: 'green',
+        padding: 15,
+        borderRadius: 50,
+        width: 120,
+        alignItems: 'center',
+    },
+    buttonText: {
+        color: 'white',
+        fontSize: 18,
     },
 });
 

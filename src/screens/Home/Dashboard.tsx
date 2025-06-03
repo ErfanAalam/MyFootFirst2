@@ -179,82 +179,54 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchOrders = async () => {
             if (!userData?.RetailerId) {
-                console.log('No RetailerId found in userData');
                 return;
             }
 
             try {
-                console.log('Fetching orders for RetailerId:', userData.RetailerId);
-
-                // First, let's check if the customers collection exists and has documents
-                const customersRef = firestore()
+                setLoading(true);
+                const retailerRef = firestore()
                     .collection('RetailersOrders')
-                    .doc(userData.RetailerId)
-                    .collection('customers')
+                    .doc(userData.RetailerId);
 
-                console.log('Attempting to fetch customers collection...');
+                // Get all customers
+                const customersRef = retailerRef.collection('customers');
                 const customersSnapshot = await customersRef.get();
 
-
-                // Log snapshot details without trying to stringify the entire object
-                console.log('Snapshot details:', {
-                    empty: customersSnapshot.empty,
-                    size: customersSnapshot.size,
-                    docs: customersSnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        exists: doc.exists,
-                        data: doc.data()
-                    }))
-                });
-
                 if (customersSnapshot.empty) {
-                    console.log('No customers found in collection');
                     setOrders([]);
-                    setLoading(false);
                     return;
                 }
 
-                const ordersData: OrderData[] = [];
+                const allOrders: OrderData[] = [];
 
-                // Iterate through each customer's orders with more detailed logging
+                // Process each customer's orders
                 for (const customerDoc of customersSnapshot.docs) {
-                    console.log('Processing customer document:', {
-                        id: customerDoc.id,
-                        exists: customerDoc.exists,
-                        data: customerDoc.data()
-                    });
+                    const customerId = customerDoc.id;
 
-                    const ordersRef = customerDoc.ref.collection('orders');
-                    const ordersSnapshot = await ordersRef.get();
+                    try {
+                        const ordersRef = customerDoc.ref.collection('orders');
+                        const ordersSnapshot = await ordersRef.get();
 
-                    console.log(`Found ${ordersSnapshot.docs.length} orders for customer ${customerDoc.id}`);
-
-                    // Log orders snapshot details without stringifying
-                    console.log('Orders snapshot details:', {
-                        empty: ordersSnapshot.empty,
-                        size: ordersSnapshot.size,
-                        docs: ordersSnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            exists: doc.exists,
-                            data: doc.data()
-                        }))
-                    });
-
-                    ordersSnapshot.docs.forEach(orderDoc => {
-                        const orderData = orderDoc.data() as OrderData;
-                        console.log('Order data:', {
-                            id: orderDoc.id,
-                            data: orderData
+                        ordersSnapshot.docs.forEach((orderDoc) => {
+                            const orderData = orderDoc.data() as OrderData;
+                            orderData.customerId = customerId;
+                            allOrders.push(orderData);
                         });
-                        ordersData.push(orderData);
-                    });
+                    } catch (customerError: any) {
+                        console.error(`Error processing customer ${customerId}:`, {
+                            message: customerError?.message,
+                            code: customerError?.code
+                        });
+                        continue;
+                    }
                 }
 
-                console.log('Total orders collected:', ordersData.length);
-                setOrders(ordersData);
-            } catch (error) {
-                console.error('Detailed error fetching orders:', error);
-                showAlert('Error', 'Failed to fetch orders. Check console for details.', 'error');
+                // Sort orders by date, most recent first
+                allOrders.sort((a, b) => b.dateOfOrder - a.dateOfOrder);
+                setOrders(allOrders);
+            } catch (error: any) {
+                console.error('Error fetching orders:', error);
+                showAlert('Error', 'Failed to fetch orders. Please try again later.', 'error');
             } finally {
                 setLoading(false);
             }
@@ -453,27 +425,11 @@ const Dashboard = () => {
         // Calculate total profit for each order
         const totalProfit = filteredOrders.reduce((sum, order) => {
             const orderProfit = order.products.reduce((productSum, product) => {
-                // Normalize product title by making lowercase and removing "insole" word
                 const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
-                // Get base price and shipping from pricing data
-                // const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
-                // const shippingCost = Number(pricing?.Shipping) || 0;
-
-                // Calculate total cost (base price + shipping) * quantity
-                // const totalCost = (basePrice + shippingCost) * product.quantity;
-                // setTotalCost(totalCost)
-                // Get selling price from retailer markup
                 const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
-                // Calculate total revenue (markup * quantity)
                 const totalRevenue = markupValue * product.quantity;
-
-                // Calculate profit as total revenue - total cost
-                const profit = totalRevenue;
-
-                return productSum + profit;
+                return productSum + totalRevenue;
             }, 0);
-
-            console.log(`Total profit for order ${order.orderId}: ${orderProfit}`);
             return sum + orderProfit;
         }, 0);
 
@@ -547,13 +503,9 @@ const Dashboard = () => {
             const periodProfit = periodOrders.reduce((sum, order) => {
                 const orderProfit = order.products.reduce((productSum, product) => {
                     const normalizedTitle = product.title.toLowerCase().replace(' insole', '').charAt(0).toUpperCase() + product.title.toLowerCase().replace(' insole', '').slice(1);
-                    const basePrice = Number(pricing?.[normalizedTitle as keyof typeof pricing]) || 0;
-                    const shippingCost = Number(pricing?.Shipping) || 0;
-                    const totalCost = (basePrice + shippingCost) * product.quantity;
                     const markupValue = Number(markup[normalizedTitle as keyof typeof markup]) || 0;
                     const totalRevenue = markupValue * product.quantity;
-                    const profit = totalRevenue;
-                    return productSum + profit;
+                    return productSum + totalRevenue;
                 }, 0);
                 return sum + orderProfit;
             }, 0);
@@ -820,7 +772,7 @@ const Dashboard = () => {
                                 <View style={styles.orderProductsCell}>
                                     {order.products.map((product, pIndex) => (
                                         <Text key={pIndex} style={styles.productText} numberOfLines={1} ellipsizeMode="tail">
-                                            {(product.title)}(x{product.quantity})
+                                            {product.title} (x{product.quantity})
                                         </Text>
                                     ))}
                                 </View>
@@ -1094,7 +1046,7 @@ const styles = StyleSheet.create({
     },
     chartContainer: {
         alignItems: 'center',
-        overflow:'hidden',
+        overflow: 'hidden',
         marginTop: 10,
         backgroundColor: '#fff',
         borderRadius: 10,
@@ -1108,7 +1060,7 @@ const styles = StyleSheet.create({
     chart: {
         marginVertical: 8,
         borderRadius: 16,
-        marginLeft:-30,
+        marginLeft: -30,
     },
     tableRow: {
         flexDirection: 'row',
@@ -1385,9 +1337,9 @@ const styles = StyleSheet.create({
     orderHeaderCell: {
         flex: 1,
         fontWeight: 'bold',
-        fontSize: 13,
+        fontSize: 12,
         color: '#333',
-        paddingHorizontal: 10,
+        paddingHorizontal: 4,
     },
     orderTableRow: {
         flexDirection: 'row',
@@ -1398,18 +1350,18 @@ const styles = StyleSheet.create({
     },
     orderTableCell: {
         flex: 1,
-        fontSize: 12,
+        fontSize: 11,
         color: '#333',
-        paddingHorizontal: 4,
+        paddingHorizontal: 2,
     },
     orderProductsCell: {
         flex: 2,
-        paddingHorizontal: 4,
+        paddingHorizontal: 2,
     },
     productText: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#333',
-        marginBottom: 4,
+        marginBottom: 2,
     },
 });
 

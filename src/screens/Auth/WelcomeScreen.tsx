@@ -32,23 +32,18 @@ const sideSpacing = (width - bannerWidth) / 2;
 const banners = [
   {
     id: '1',
-    image: require('../../assets/images/banner3.jpeg'),
+    image: require('../../assets/images/img1.jpg'),
     title: 'Unlock New Revenue Streams',
   },
   {
     id: '2',
-    image: require('../../assets/images/banner1.jpg'),
+    image: require('../../assets/images/banner1.png'),
     title: 'AI-Powered Foot Analysis for Precision',
   },
   {
     id: '3',
-    image: require('../../assets/images/banner2.webp'),
+    image: require('../../assets/images/banner2.jpg'),
     title: 'Seamless Order Fulfilment & Commission',
-  },
-  {
-    id: '4',
-    image: require('../../assets/images/banner3.jpeg'),
-    title: 'Get Started with Ease',
   },
 ];
 

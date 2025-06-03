@@ -1,11 +1,10 @@
 // src/navigation/AppTabs.tsx
 import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaView, StatusBar, Platform, View, Text, StyleSheet } from 'react-native';
+import { StatusBar, View, StyleSheet } from 'react-native';
 import HomeScreen from '../screens/Home/HomeScreen';
 import ProfileScreen from '../screens/Home/ProfileScreen';
-import EducationScreen from '../screens/Home/EducationScreen';  // Add your Education screen here
-// import EcommerceScreen from '../screens/Home/EcommerceScreen';  // Add your Ecommerce screen here
+import EducationScreen from '../screens/Home/EducationScreen'; 
 import Dashboard from '../screens/Home/Dashboard';
 import { AppTabsParamList } from '../types/navigation';
 import Icon from 'react-native-vector-icons/FontAwesome5';
@@ -17,19 +16,26 @@ const Tab = createBottomTabNavigator<AppTabsParamList>();
 
 const AppTabs = () => {
   const [isEmployee, setIsEmployee] = useState<boolean | null>(null);
+  const [employeeRole, setEmployeeRole] = useState<string | null>(null);
 
   useEffect(() => {
     const checkEmployeeStatus = async () => {
-      const value = await AsyncStorage.getItem('isEmployeeLoggedIn');
-      setIsEmployee(value === 'true');
+      const employeeStatus = await AsyncStorage.getItem('isEmployeeLoggedIn');
+      const employeeData = await AsyncStorage.getItem('employeeData');
+      const role = employeeData?.role;
+      setIsEmployee(employeeStatus === 'true');
+      setEmployeeRole(role);
     };
     checkEmployeeStatus();
   }, []);
 
   // Optionally show a loading screen while checking
-  if (isEmployee === null) {
+  if (isEmployee === null || employeeRole === null) {
     return null;
   }
+
+  const shouldShowDashboard = !isEmployee || (isEmployee && employeeRole === 'full_access');
+
   return (
     <SafeAreaProvider>
       <StatusBar backgroundColor="#ffffff" barStyle="light-content" />
@@ -109,7 +115,7 @@ const AppTabs = () => {
       >
         <Tab.Screen name="Home" component={HomeScreen} />
         <Tab.Screen name="Education" component={EducationScreen} />
-        {!isEmployee && <Tab.Screen name="Dashboard" component={Dashboard} />}
+        {shouldShowDashboard && <Tab.Screen name="Dashboard" component={Dashboard} />}
         <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>
     </SafeAreaProvider>

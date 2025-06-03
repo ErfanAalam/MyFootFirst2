@@ -103,7 +103,7 @@ const insoleData = {
   Comfort: {
     id: 'insole-comfort',
     name: 'COMFORT Insole',
-    image: require('../../assets/images/banner3.jpeg'),
+    image: require('../../assets/images/img1.jpg'),
     features: [
       'Firm support for feet',
       'Designed to ease chronic heel, knee, or back pain',
