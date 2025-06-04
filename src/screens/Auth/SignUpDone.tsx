@@ -7,7 +7,6 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Alert,
   Modal,
 } from 'react-native';
 import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';

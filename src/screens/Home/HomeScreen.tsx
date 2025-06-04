@@ -201,9 +201,9 @@ const HomeScreen = () => {
       const hasSubscription = await checkRetailerSubscription(retailerId);
 
       if (hasSubscription) {
-        navigation.navigate("FootScanScreen", { customer, RetailerId: retailerId });
+        navigation.navigate('FootScanScreen', { customer, RetailerId: retailerId });
       } else {
-        navigation.navigate("OrthoticSale", { customer, RetailerId: retailerId });
+        navigation.navigate('OrthoticSale', { customer, RetailerId: retailerId });
       }
     } catch (error) {
       console.error('Error updating customer data:', error);

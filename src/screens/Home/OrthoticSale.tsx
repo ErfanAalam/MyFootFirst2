@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -55,32 +55,40 @@ const OrthoticSale = () => {
   const [_discountedPrice, setDiscountedPrice] = useState<number | null>(null);
   const [couponError, setCouponError] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-  const plans = [
-    {
-      id: '1-month',
-      name: '1 Month',
-      price: '€49',
-      discount: null,
-      popular: false,
-      bestValue: false,
-    },
-    {
-      id: '6-month',
-      name: '6 Months',
-      price: '€255',
-      discount: '15% off',
-      popular: true,
-      bestValue: false,
-    },
-    {
-      id: '12-month',
-      name: '12 Months',
-      price: '€420',
-      discount: '30% off',
-      popular: false,
-      bestValue: true,
-    },
-  ];
+  const [plans, setPlans] = useState<Plan[]>([]);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const querySnapshot = await firestore()
+          .collection('membershipPlans')
+          .get();
+
+        const plansData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Plan[];
+
+        // Sort plans based on their duration
+        const sortedPlans = plansData.sort((a, b) => {
+          const getDuration = (name: string) => {
+            if (name.toLowerCase().includes('1 month')) return 1;
+            if (name.toLowerCase().includes('6 month')) return 2;
+            if (name.toLowerCase().includes('12 month')) return 3;
+            return 4; // Any other plans will be placed at the end
+          };
+          return getDuration(a.name) - getDuration(b.name);
+        });
+
+        setPlans(sortedPlans);
+      } catch (error) {
+        console.error('Error fetching plans:', error);
+        Alert.alert('Error', 'Failed to load subscription plans');
+      }
+    };
+
+    fetchPlans();
+  }, []);
 
   const renderPlanBadge = (plan: Plan) => {
     if (plan.popular) {

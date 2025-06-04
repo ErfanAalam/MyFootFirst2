@@ -79,7 +79,6 @@ const insoleData = {
   Sport: {
     id: 'insole-sport',
     name: 'SPORT Insole',
-    image: require('../../assets/images/banner1.png'),
     features: [
       'Lightweight and flexible for active movement',
       'Ideal for athletic use',
@@ -91,7 +90,6 @@ const insoleData = {
   Active: {
     id: 'insole-active',
     name: 'ACTIVE Insole',
-    image: require('../../assets/images/banner2.jpg'),
     features: [
       'All-day cushioning for casual and work shoes',
       'Great for moderate activity',
@@ -103,7 +101,6 @@ const insoleData = {
   Comfort: {
     id: 'insole-comfort',
     name: 'COMFORT Insole',
-    image: require('../../assets/images/img1.jpg'),
     features: [
       'Firm support for feet',
       'Designed to ease chronic heel, knee, or back pain',

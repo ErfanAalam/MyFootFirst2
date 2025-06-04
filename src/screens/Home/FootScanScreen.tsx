@@ -151,7 +151,7 @@ const FootScanScreen = () => {
             // @ts-ignore - Navigation type issue
             navigation.navigate('InsoleQuestions', {
                 customer: customer,
-                RetailerId: RetailerId
+                RetailerId: RetailerId,
             });
         }
     };
@@ -798,9 +798,6 @@ const FootScanScreen = () => {
                                 allowsLinkPreview: false,
                             })}
                         />
-                        <View style={[styles.webViewCloseButton, Platform.OS === 'ios' && styles.webViewCloseButtonIOS]}>
-                            <Button title="Close" onPress={() => setShowWebView(false)} />
-                        </View>
                     </Modal>
                 </View>
             </View>
@@ -1257,16 +1254,6 @@ const styles = StyleSheet.create({
     },
     nextTextIOS: {
         fontSize: 18,
-    },
-    webViewCloseButton: {
-        position: 'absolute',
-        bottom: 20,
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-    },
-    webViewCloseButtonIOS: {
-        bottom: 40, // More space from bottom on iOS
     },
     modalOverlay: {
         flex: 1,

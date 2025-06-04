@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -17,7 +17,7 @@ import { getAuth } from '@react-native-firebase/auth';
 import { useUser } from '../../contexts/UserContext';
 
 const GoogleRetailer = () => {
-    const {setHasProfile} = useUser()
+    const { setHasProfile } = useUser()
     const [alertVisible, setAlertVisible] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{
         title: string;
@@ -139,7 +139,7 @@ const GoogleRetailer = () => {
         setShowBusinessTypeDropdown(false);
     };
 
-    const PrivacyPolicyModal = () => (
+    const PrivacyPolicyModal = useCallback( () => (
         <Modal
             visible={showPrivacyModal}
             transparent={true}
@@ -287,7 +287,7 @@ const GoogleRetailer = () => {
                 </View>
             </View>
         </Modal>
-    );
+    ),[showPrivacyModal]);
 
     const handleOrthopticsSelect = (selection: string) => {
         setSellsOrthotics(selection);

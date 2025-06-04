@@ -32,7 +32,7 @@ const sideSpacing = (width - bannerWidth) / 2;
 const banners = [
   {
     id: '1',
-    image: require('../../assets/images/img1.jpg'),
+    image: require('../../assets/images/img1.jpeg'),
     title: 'Unlock New Revenue Streams',
   },
   {

@@ -479,7 +479,6 @@ const Dashboard = () => {
             return sum + orderProfit;
         }, 0);
 
-        console.log('\nFinal Total Profit:', totalProfit);
 
         // Calculate date range in days
         const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -766,35 +765,47 @@ const Dashboard = () => {
                         <View style={styles.tableRow}>
                             <Text style={styles.headerCell}>Insole</Text>
                             <Text style={styles.headerCell}>Base Price</Text>
-                            <Text style={styles.headerCell}>Ship Fee</Text>
                             <Text style={styles.headerCell}>Markup</Text>
+                            <Text style={styles.headerCell}>MRP</Text>
                         </View>
                         {/* Product Rows */}
-                        {pricing && ['Sport', 'Active', 'Comfort'].map((product) => (
-                            <View key={product} style={styles.tableRow}>
-                                <Text style={styles.tableCell}>{product}</Text>
-                                <Text style={styles.tableCell}>{pricing.currency}{pricing[product as keyof typeof pricing]}</Text>
-                                <Text style={styles.tableCell}>{pricing.currency}{pricing.Shipping}</Text>
-                                <TextInput
-                                    style={styles.markupInput}
-                                    value={markup[product as keyof typeof markup]}
-                                    onChangeText={(text) => {
-                                        const updatedMarkup = { ...markup };
-                                        updatedMarkup[product as keyof typeof markup] = text;
-                                        setMarkup(updatedMarkup);
-                                    }}
-                                    keyboardType="numeric"
-                                    placeholder="0"
-                                />
-                            </View>
-                        ))}
+                        {pricing && ['Sport', 'Active', 'Comfort'].map((product) => {
+                            const basePrice = Number(pricing[product as keyof typeof pricing]);
+                            const markupValue = Number(markup[product as keyof typeof markup]) || 0;
+                            const mrp = basePrice + Number(pricing.Shipping) + markupValue;
+
+                            return (
+                                <View key={product} style={styles.tableRow}>
+                                    <Text style={styles.tableCell}>{product}</Text>
+                                    <Text style={styles.tableCell}>{pricing.currency}{basePrice}</Text>
+                                    <TextInput
+                                        style={styles.markupInput}
+                                        value={markup[product as keyof typeof markup]}
+                                        onChangeText={(text) => {
+                                            const updatedMarkup = { ...markup };
+                                            updatedMarkup[product as keyof typeof markup] = text;
+                                            setMarkup(updatedMarkup);
+                                        }}
+                                        keyboardType="numeric"
+                                        placeholder="0"
+                                    />
+                                    <Text style={styles.tableCell}>{pricing.currency}{mrp.toFixed(2)}</Text>
+                                </View>
+                            );
+                        })}
+
+                        {/* Shipping Fee Row */}
+                        <View style={[styles.tableRow, styles.shippingRow]}>
+                            <Text style={styles.shippingText}>Shipping Fee (Same for all products):</Text>
+                            <Text style={styles.shippingValue}>{pricing?.currency}{pricing?.Shipping}</Text>
+                        </View>
 
                         <TouchableOpacity style={styles.submitButton} onPress={handleMarkupSubmit}>
                             <Text style={styles.submitButtonText}>Submit Markup</Text>
                         </TouchableOpacity>
 
                         <Text style={styles.noteText}>
-                            Markup used to calculate revenue for yourself. Shoe store just pays Base price and shipping fee to the manufacturer.
+                            Using last updated markup to calculate MRP. Shoe store just pays Base price and shipping fee to the manufacturer.
                         </Text>
                     </View>
 
@@ -1114,6 +1125,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
         paddingVertical: 12,
+        alignItems:'center',
     },
     headerCell: {
         flex: 1,
@@ -1134,6 +1146,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 5,
         fontSize: 14,
+        marginRight:4,
     },
     noteText: {
         fontSize: 12,
@@ -1409,6 +1422,25 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#333',
         marginBottom: 2,
+    },
+    shippingRow: {
+        backgroundColor: '#f8f9fa',
+        borderTopWidth: 1,
+        borderTopColor: '#ddd',
+        marginTop: 10,
+        paddingVertical: 15,
+    },
+    shippingText: {
+        flex: 2,
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    shippingValue: {
+        flex: 1,
+        fontSize: 14,
+        color: '#333',
+        fontWeight: 'bold',
     },
 });
 
