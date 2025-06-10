@@ -204,7 +204,7 @@ const InsoleRecommendation = () => {
 
         // Then fetch pricing for the retailer's country
         const countryDoc = await firestore()
-          .collection('InsolePricing')
+          .collection('RInsolePricing')
           .doc(country)
           .get();
 
@@ -213,7 +213,7 @@ const InsoleRecommendation = () => {
         } else {
           // If country not found, use Ireland's pricing as fallback
           const irelandDoc = await firestore()
-            .collection('InsolePricing')
+            .collection('RInsolePricing')
             .doc('Ireland')
             .get();
 
@@ -225,7 +225,7 @@ const InsoleRecommendation = () => {
         console.error('Error fetching retailer or pricing:', error);
         // Fallback to Ireland pricing on error
         const irelandDoc = await firestore()
-          .collection('InsolePricing')
+          .collection('RInsolePricing')
           .doc('Ireland')
           .get();
 
